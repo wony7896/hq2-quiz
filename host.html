@@ -205,9 +205,9 @@
   .winners li button:hover { background: #fff; color: var(--danger); }
   .winners .empty { font-size: 26px; color: var(--muted); font-weight: 600; line-height: 1.5; }
 
-  .lotto { position: absolute; inset: 0; z-index: 5; width: 1920px; height: 1080px; pointer-events: none; }
-  .lotto[hidden] { display: none; }
-  .draw.lotto-on .draw-body, .draw.lotto-on .arena { visibility: hidden; }
+  .wheel { position: absolute; inset: 0; z-index: 5; width: 1920px; height: 1080px; pointer-events: none; }
+  .wheel[hidden] { display: none; }
+  .draw.wheel-on .draw-body, .draw.wheel-on .arena { visibility: hidden; }
   .win-overlay {
     position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; text-align: center; color: #fff;
     background: radial-gradient(circle at 50% 40%, #3d77ff, var(--b-navy) 72%);
@@ -684,7 +684,7 @@ const VIEWS = {
           </div>
           ${qd ? '' : '<aside class="winners"><h3>당첨자 <small data-win-n></small></h3><ol data-win-list></ol></aside>'}
         </div>
-        <canvas class="lotto" data-lotto hidden></canvas>
+        <canvas class="wheel" data-wheel hidden></canvas>
         <div class="win-overlay" data-overlay hidden>
           <canvas width="1920" height="1080" data-confetti></canvas>
           <div class="win-card">
@@ -969,7 +969,7 @@ async function startDraw() {
     refresh();
     return;
   }
-  await lotto(res.pool || [], res.winner.nickname, res.pool_size);
+  await roulette(res.pool || [], res.winner.nickname, res.pool_size);
   showWinner(res.winner);
   drawing = false;
   refresh();
@@ -977,244 +977,186 @@ async function startDraw() {
   setTimeout(() => rpc('quiz_admin_touch', { p_pin: pin }).catch(() => {}), 900);
 }
 
-// 로또 추첨기: 아이디가 적힌 공들이 유리 드럼 안에서 바람에 날려 섞이다가,
-// 당첨 공이 금색으로 바뀌어 위로 올라온 뒤 앞으로 크게 튀어나온다 (모두 5초)
-const BALL_COLORS = [
-  { base: '#1d57e6', light: '#8fb0ff', edge: '#0f3494', text: '#fff' },
-  { base: '#ffffff', light: '#ffffff', edge: '#c3d1f2', text: '#0b1f5b' },
-  { base: '#0b1f5b', light: '#4f69bd', edge: '#040c2b', text: '#fff' },
-  { base: '#5b8cff', light: '#c2d4ff', edge: '#2c5bd0', text: '#fff' },
+// 룰렛: 참여자 아이디가 적힌 판이 빠르게 돌다가 점점 느려지고, 위쪽 바늘이 칸을 넘길 때마다 튕긴다.
+// 멈춘 칸이 금색으로 빛나면 당첨 (약 5초)
+const WHEEL_COLORS = [
+  { fill: '#1d57e6', text: '#fff' },
+  { fill: '#ffffff', text: '#0b1f5b' },
+  { fill: '#0b1f5b', text: '#fff' },
+  { fill: '#dbe6ff', text: '#0b1f5b' },
 ];
-const GOLD_BALL = { base: '#ffcf3f', light: '#fff3c4', edge: '#d39b00', text: '#0b1f5b' };
+const WHEEL_GOLD = { fill: '#ffcf3f', text: '#0b1f5b' };
 const CANVAS_FONT = "'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', sans-serif";
 
-function ballSprite(name, col, r, k) {
+function wheelImage(names, colors, R, k) {
   const c = document.createElement('canvas');
-  c.width = c.height = Math.ceil(r * 2 * k);
+  c.width = c.height = Math.ceil(R * 2 * k);
   const g = c.getContext('2d');
   g.scale(k, k);
-  const grad = g.createRadialGradient(r * 0.7, r * 0.6, r * 0.05, r, r, r);
-  grad.addColorStop(0, col.light);
-  grad.addColorStop(0.5, col.base);
-  grad.addColorStop(1, col.edge);
-  g.fillStyle = grad;
-  g.beginPath();
-  g.arc(r, r, r, 0, Math.PI * 2);
-  g.fill();
-  // 이름은 공 너비에 맞춰 줄이고, 그래도 길면 말줄임
-  const maxW = r * 1.7;
-  let size = r * 0.6;
-  let text = name;
-  g.font = `800 ${size}px ${CANVAS_FONT}`;
-  const w = g.measureText(text).width;
-  if (w > maxW) {
-    size = Math.max(r * 0.32, (size * maxW) / w);
+  g.translate(R, R);
+  const n = names.length;
+  const seg = (Math.PI * 2) / n;
+  const outer = R * 0.93;
+  const maxW = outer - R * 0.3;
+  const base = Math.min(52, ((Math.PI * 2 * R * 0.62) / n) * 0.62);
+  names.forEach((name, i) => {
+    g.fillStyle = colors[i].fill;
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.arc(0, 0, R, i * seg, (i + 1) * seg);
+    g.closePath();
+    g.fill();
+    // 이름은 칸 크기에 맞춰 줄이고, 그래도 길면 말줄임
+    g.save();
+    g.rotate((i + 0.5) * seg);
+    let size = base;
+    let text = name;
     g.font = `800 ${size}px ${CANVAS_FONT}`;
+    const w = g.measureText(text).width;
+    if (w > maxW) {
+      size = Math.max(16, (size * maxW) / w);
+      g.font = `800 ${size}px ${CANVAS_FONT}`;
+    }
+    while (g.measureText(text).width > maxW && text.length > 2) text = `${text.slice(0, -2)}…`;
+    g.fillStyle = colors[i].text;
+    g.textAlign = 'right';
+    g.textBaseline = 'middle';
+    g.fillText(text, outer, 0);
+    g.restore();
+  });
+  if (n > 1) {
+    g.strokeStyle = 'rgba(11, 31, 91, 0.2)';
+    g.lineWidth = 2;
+    for (let i = 0; i < n; i++) {
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.lineTo(Math.cos(i * seg) * R, Math.sin(i * seg) * R);
+      g.stroke();
+    }
   }
-  while (g.measureText(text).width > maxW && text.length > 2) text = `${text.slice(0, -2)}…`;
-  g.fillStyle = col.text;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText(text, r, r + size * 0.05);
-  g.fillStyle = 'rgba(255, 255, 255, 0.35)';
-  g.beginPath();
-  g.ellipse(r * 0.62, r * 0.4, r * 0.36, r * 0.18, -0.6, 0, Math.PI * 2);
-  g.fill();
   return c;
 }
 
-function lotto(pool, winner, poolSize) {
+function roulette(pool, winner, poolSize) {
   const root = stageEl.querySelector('.draw');
-  const cv = root.querySelector('[data-lotto]');
+  const cv = root.querySelector('[data-wheel]');
   const k = Math.min(2, Math.max(1, (devicePixelRatio || 1) * (stageEl.getBoundingClientRect().width / 1920)));
   cv.width = 1920 * k;
   cv.height = 1080 * k;
   const ctx = cv.getContext('2d');
   cv.hidden = false;
-  root.classList.add('lotto-on');
+  root.classList.add('wheel-on');
 
-  const CX = 960, CY = 548, R = 360, WALL = 10;
-  const TOP = CY - R + WALL + 4;
-  const names = [winner, ...pool.filter((n) => n !== winner).slice(0, 23)].sort(() => Math.random() - 0.5);
-  const r = Math.max(40, Math.min(76, R * Math.sqrt(0.4 / names.length)));
-  const balls = names.map((name, i) => ({
-    name, r, x: CX, y: CY, vx: rand(-200, 200), vy: rand(-100, 300), a: rand(0, Math.PI * 2),
-    img: ballSprite(name, BALL_COLORS[i % BALL_COLORS.length], r, k),
-  }));
-  // 겹치지 않게 드럼 안에 흩어 놓는다
-  balls.forEach((b, i) => {
-    for (let t = 0; t < 300; t++) {
-      const ang = rand(0, Math.PI * 2);
-      const d = Math.sqrt(Math.random()) * (R - WALL - r - 2);
-      b.x = CX + Math.cos(ang) * d;
-      b.y = CY + Math.sin(ang) * d;
-      if (balls.slice(0, i).every((o) => Math.hypot(o.x - b.x, o.y - b.y) > r * 2)) break;
-    }
-  });
-  const win = balls.find((b) => b.name === winner);
-  const BIG = 250;
-  const bigImg = ballSprite(winner, GOLD_BALL, BIG, k);
+  const CX = 960, CY = 580, R = 370, RIM = 30, BULBS = 32;
+  const TAU = Math.PI * 2;
+  const names = [winner, ...pool.filter((n) => n !== winner).slice(0, 39)].sort(() => Math.random() - 0.5);
+  const n = names.length;
+  const seg = TAU / n;
+  const w = names.indexOf(winner);
+  // 이웃한 칸끼리 같은 색이 되지 않게 (마지막 칸과 첫 칸도 이웃)
+  const colors = names.map((_, i) => WHEEL_COLORS[n > 1 && n % 4 === 1 && i === n - 1 ? 2 : i % 4]);
+  const plain = wheelImage(names, colors, R, k);
+  const lit = wheelImage(names, colors.map((c, i) => (i === w ? WHEEL_GOLD : c)), R, k);
 
-  const T = 5000, PICK = 3900, OUT = 4350;
-  let picked = false;
-  const live = (b) => !(picked && b === win);
+  // 바늘(위쪽)이 당첨 칸 안의 아무 곳에서 멈추도록 5바퀴 남짓 돌린다
+  const SPIN = 4600, END = 5300;
+  const th0 = rand(0, TAU);
+  const target = -Math.PI / 2 - (w + rand(0.15, 0.85)) * seg;
+  const thEnd = th0 + TAU * 5 + ((((target - th0) % TAU) + TAU) % TAU);
+  const ease = (x) => 1 - (1 - x) ** 2.6;
+  const under = (th) => Math.floor(((((-Math.PI / 2 - th) % TAU) + TAU) % TAU) / seg);
 
-  const step = (dt, blow) => {
-    for (const b of balls) {
-      if (!live(b)) continue;
-      let ax = 0, ay = 2000;
-      if (blow > 0) {
-        const dx = b.x - CX, dy = b.y - CY, d = Math.hypot(dx, dy) || 1;
-        if (dy > -R * 0.2) ay -= blow * rand(1400, 4600); // 아래에서 바람이 불어 올린다
-        ax += blow * rand(-2600, 2600);
-        ay += blow * rand(-1400, 1400);
-        ax += (blow * -dy / d) * 900; // 소용돌이
-        ay += (blow * dx / d) * 900;
-      }
-      b.vx = (b.vx + ax * dt) * 0.996;
-      b.vy = (b.vy + ay * dt) * 0.996;
-      const sp = Math.hypot(b.vx, b.vy);
-      if (sp > 1900) { b.vx *= 1900 / sp; b.vy *= 1900 / sp; }
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-      b.a += (b.vx / b.r) * dt * 0.6;
-    }
-    for (let i = 0; i < balls.length; i++) {
-      for (let j = i + 1; j < balls.length; j++) {
-        const p = balls[i], q = balls[j];
-        if (!live(p) || !live(q)) continue;
-        const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy), min = p.r + q.r;
-        if (d >= min || d === 0) continue;
-        const nx = dx / d, ny = dy / d, over = (min - d) / 2;
-        p.x -= nx * over; p.y -= ny * over;
-        q.x += nx * over; q.y += ny * over;
-        const rel = (q.vx - p.vx) * nx + (q.vy - p.vy) * ny;
-        if (rel < 0) {
-          const imp = (-1.9 * rel) / 2;
-          p.vx -= imp * nx; p.vy -= imp * ny;
-          q.vx += imp * nx; q.vy += imp * ny;
-        }
-      }
-    }
-    for (const b of balls) {
-      if (!live(b)) continue;
-      const dx = b.x - CX, dy = b.y - CY, d = Math.hypot(dx, dy) || 1, lim = R - WALL - b.r;
-      if (d <= lim) continue;
-      const nx = dx / d, ny = dy / d;
-      b.x = CX + nx * lim;
-      b.y = CY + ny * lim;
-      const vn = b.vx * nx + b.vy * ny;
-      if (vn > 0) { b.vx -= 1.8 * vn * nx; b.vy -= 1.8 * vn * ny; }
-    }
-  };
-
-  const drawBall = (img, x, y, rad, a) => {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(a);
-    ctx.drawImage(img, -rad, -rad, rad * 2, rad * 2);
-    ctx.restore();
-  };
-
-  const draw = (t, p, dim, rr) => {
+  const draw = (t, th, kick) => {
     ctx.setTransform(k, 0, 0, k, 0, 0);
     ctx.clearRect(0, 0, 1920, 1080);
-    ctx.globalAlpha = dim;
-    // 받침대
+    const stopped = t >= SPIN;
+    // 테두리 (그림자)
+    ctx.save();
+    ctx.shadowColor = 'rgba(11, 31, 91, 0.28)';
+    ctx.shadowBlur = 50;
+    ctx.shadowOffsetY = 20;
     ctx.fillStyle = '#0b1f5b';
     ctx.beginPath();
-    ctx.moveTo(CX - 150, CY + R - 30);
-    ctx.lineTo(CX + 150, CY + R - 30);
-    ctx.lineTo(CX + 230, CY + R + 80);
-    ctx.lineTo(CX - 230, CY + R + 80);
-    ctx.closePath();
+    ctx.arc(CX, CY, R + RIM, 0, TAU);
     ctx.fill();
-    // 유리 드럼과 바람 구멍
-    const glass = ctx.createRadialGradient(CX - R * 0.3, CY - R * 0.35, R * 0.1, CX, CY, R);
-    glass.addColorStop(0, 'rgba(255, 255, 255, 0.98)');
-    glass.addColorStop(1, 'rgba(219, 230, 255, 0.98)');
-    ctx.fillStyle = glass;
-    ctx.beginPath();
-    ctx.arc(CX, CY, R, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#c3d1f2';
-    ctx.beginPath();
-    ctx.arc(CX, CY + R - WALL, 46, Math.PI, 0);
-    ctx.fill();
-    for (const b of balls) if (live(b)) drawBall(b.img, b.x, b.y, b.r, b.a);
-    ctx.strokeStyle = '#b9cdfb';
-    ctx.lineWidth = WALL * 2;
-    ctx.beginPath();
-    ctx.arc(CX, CY, R, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-    ctx.lineWidth = 16;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.arc(CX, CY, R - 44, Math.PI * 1.12, Math.PI * 1.38);
-    ctx.stroke();
-    // 남은 시간
-    ctx.strokeStyle = '#1d57e6';
+    ctx.restore();
+    // 판
+    ctx.save();
+    ctx.translate(CX, CY);
+    ctx.rotate(th);
+    ctx.drawImage(plain, -R, -R, R * 2, R * 2);
+    if (stopped) {
+      ctx.globalAlpha = Math.min(1, (t - SPIN) / 200);
+      ctx.drawImage(lit, -R, -R, R * 2, R * 2);
+    }
+    ctx.restore();
+    // 테두리 전구: 돌 때는 판을 따라 깜빡이고, 멈추면 다 같이 번쩍인다
+    const phase = stopped ? Math.floor((t - SPIN) / 140) % 2 : Math.floor((th / TAU) * BULBS * 2) % 2;
+    for (let i = 0; i < BULBS; i++) {
+      const a = (i / BULBS) * TAU;
+      const on = stopped ? phase === 0 : (i + phase) % 2 === 0;
+      ctx.fillStyle = on ? '#ffcf3f' : '#3b4f8f';
+      ctx.beginPath();
+      ctx.arc(CX + Math.cos(a) * (R + RIM / 2), CY + Math.sin(a) * (R + RIM / 2), 6, 0, TAU);
+      ctx.fill();
+    }
+    // 가운데 축
+    const hub = ctx.createRadialGradient(CX - 20, CY - 24, 6, CX, CY, 78);
+    hub.addColorStop(0, '#ffffff');
+    hub.addColorStop(1, '#dbe6ff');
+    ctx.fillStyle = hub;
+    ctx.strokeStyle = '#0b1f5b';
     ctx.lineWidth = 8;
     ctx.beginPath();
-    ctx.arc(CX, CY, R + 24, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
+    ctx.arc(CX, CY, 74, 0, TAU);
+    ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#44516f';
-    ctx.font = `700 34px ${CANVAS_FONT}`;
+    ctx.fillStyle = '#0b1f5b';
+    ctx.font = `900 34px ${CANVAS_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(picked ? '당첨 공이 나왔어요!' : `추첨 대상 ${poolSize}명 · 두구두구…`, CX, CY + R + 125);
-    ctx.globalAlpha = 1;
-    if (!picked) return;
-    // 뽑힌 공
-    if (t < OUT) {
-      drawBall(win.img, win.x, win.y, r, win.a);
-      return;
-    }
-    const glow = ctx.createRadialGradient(win.x, win.y, rr * 0.8, win.x, win.y, rr * 1.7);
-    glow.addColorStop(0, 'rgba(255, 207, 63, 0.55)');
-    glow.addColorStop(1, 'rgba(255, 207, 63, 0)');
-    ctx.fillStyle = glow;
+    ctx.fillText('추첨', CX, CY + 1);
+    // 바늘: 칸을 넘길 때마다 판이 도는 쪽으로 튕긴다
+    ctx.save();
+    ctx.translate(CX, CY - R - 44);
+    ctx.rotate(-kick * 0.42);
+    ctx.shadowColor = 'rgba(11, 31, 91, 0.35)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = '#ffcf3f';
+    ctx.strokeStyle = '#0b1f5b';
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.arc(win.x, win.y, rr * 1.7, 0, Math.PI * 2);
+    ctx.moveTo(-30, 0);
+    ctx.lineTo(30, 0);
+    ctx.lineTo(0, 78);
+    ctx.closePath();
     ctx.fill();
-    drawBall(bigImg, win.x, win.y, rr, 0);
+    ctx.stroke();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#0b1f5b';
+    ctx.beginPath();
+    ctx.arc(0, 0, 14, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#44516f';
+    ctx.font = `700 34px ${CANVAS_FONT}`;
+    ctx.fillText(stopped ? '당첨자가 나왔어요!' : `추첨 대상 ${poolSize}명 · 두구두구…`, CX, CY + R + RIM + 55);
   };
-
-  const easeInOut = (x) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
-  const easeOutBack = (x) => 1 + 2.7 * (x - 1) ** 3 + 1.7 * (x - 1) ** 2;
 
   return new Promise((resolve) => {
     const t0 = performance.now();
-    let last = t0, from = null, a0 = 0;
+    let last = t0, idx = under(th0), kick = 0;
     const frame = (now) => {
       const t = now - t0;
-      const p = Math.min(1, t / T);
       const dt = Math.min(1 / 30, (now - last) / 1000);
       last = now;
-      const blow = t < 250 ? 0 : t < PICK ? Math.min(1, (t - 250) / 500) : Math.max(0, 1 - (t - PICK) / 500);
-      if (!picked && t >= PICK) {
-        picked = true;
-        from = { x: win.x, y: win.y };
-        a0 = Math.atan2(Math.sin(win.a), Math.cos(win.a));
-        win.img = ballSprite(winner, GOLD_BALL, r, k);
-      }
-      for (let i = 0; i < 3; i++) step(dt / 3, blow);
-      let rr = r;
-      if (picked && t < OUT) {
-        const e = easeInOut((t - PICK) / (OUT - PICK));
-        win.x = from.x + (CX - from.x) * e;
-        win.y = from.y + (TOP + r - from.y) * e;
-        win.a = a0 * (1 - e);
-      } else if (picked) {
-        const e = easeOutBack(Math.min(1, (t - OUT) / (T - OUT - 100)));
-        win.x = CX;
-        win.y = TOP + r + (540 - TOP - r) * e;
-        rr = r + (BIG - r) * e;
-      }
-      const dim = t < OUT ? 1 : 1 - 0.7 * Math.min(1, (t - OUT) / 400);
-      draw(t, p, dim, rr);
-      if (p < 1) requestAnimationFrame(frame);
+      const th = th0 + (thEnd - th0) * ease(Math.min(1, t / SPIN));
+      const cur = under(th);
+      if (cur !== idx) { idx = cur; kick = 1; }
+      kick *= Math.exp(-dt * 14);
+      draw(t, th, kick);
+      if (t < END) requestAnimationFrame(frame);
       else resolve();
     };
     requestAnimationFrame(frame);
@@ -1238,8 +1180,8 @@ function closeOverlay() {
   overlayOpen = false;
   if (!root) return;
   root.querySelector('[data-overlay]').hidden = true;
-  root.querySelector('[data-lotto]').hidden = true;
-  root.classList.remove('lotto-on');
+  root.querySelector('[data-wheel]').hidden = true;
+  root.classList.remove('wheel-on');
   // 추첨 상자 글자는 update()가 상황에 맞게 다시 채운다
   root.querySelector('[data-slot-name]').dataset.v = '';
   arenaSig = '';
