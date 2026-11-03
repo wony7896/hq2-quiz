@@ -1,0 +1,85 @@
+:root {
+  /* B블루 — 공식 값이 있으면 --b-blue 하나만 바꾸면 된다 */
+  --b-blue: #1d57e6;
+  --b-blue-600: #1546c2;
+  --b-blue-700: #10379a;
+  --b-navy: #0b1f5b;
+  --b-sky: #eef3ff;
+  --b-sky-2: #dbe6ff;
+  --b-sky-3: #b9cdfb;
+  --gold: #ffcf3f;
+
+  --ink: #0e1a3a;
+  --ink-2: #44516f;
+  --muted: #7b88a6;
+  --line: #e3e9f5;
+  --surface: #ffffff;
+  --page: #f5f8ff;
+  --danger: #d6344a;
+
+  --radius: 20px;
+  --shadow: 0 1px 2px rgba(11, 31, 91, 0.06), 0 8px 24px rgba(11, 31, 91, 0.08);
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--page); }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 14px;
+  padding: 14px 20px;
+  font-weight: 700;
+  background: var(--b-blue);
+  color: #fff;
+  transition: background 0.15s, transform 0.1s, opacity 0.15s;
+}
+.btn:hover { background: var(--b-blue-600); }
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.4; cursor: default; transform: none; background: var(--b-blue); }
+.btn.ghost { background: var(--b-sky); color: var(--b-blue-700); }
+.btn.ghost:hover { background: var(--b-sky-2); }
+.btn.danger { background: #fff0f2; color: var(--danger); }
+.btn.danger:hover { background: #ffe0e5; }
+
+.field {
+  width: 100%;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field:focus { border-color: var(--b-blue); box-shadow: 0 0 0 4px rgba(29, 87, 230, 0.14); }
+
+.toast {
+  position: fixed;
+  inset: auto auto 28px 50%;
+  margin: 0;
+  border: 0;
+  overflow: visible;
+  transform: translate(-50%, 20px);
+  background: var(--b-navy);
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 1000;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }

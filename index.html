@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d57e6">
+<title>본사2지부 문화행사 퀴즈</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="assets/base.css">
+<style>
+  body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+  .top {
+    background: linear-gradient(150deg, var(--b-blue), var(--b-navy));
+    color: #fff;
+    padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .top b { font-size: 16px; font-weight: 800; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .top span { font-size: 13px; font-weight: 700; background: rgba(255, 255, 255, 0.16); border-radius: 999px; padding: 5px 10px; white-space: nowrap; }
+  main { flex: 1; width: 100%; max-width: 520px; margin: 0 auto; padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 16px; }
+  .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 20px; }
+  .center { text-align: center; }
+  .view { display: flex; flex-direction: column; gap: 16px; animation: up 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  @keyframes up { from { opacity: 0; transform: translateY(12px); } }
+
+  .hero { padding: 18px 4px 4px; }
+  .eyebrow { font-size: 13px; font-weight: 800; color: var(--b-blue); letter-spacing: 0.02em; }
+  .hero h1 { font-size: 30px; line-height: 1.2; font-weight: 900; letter-spacing: -0.03em; margin: 8px 0 6px; color: var(--b-navy); }
+  .hero p { margin: 0; font-size: 17px; font-weight: 700; color: var(--b-blue); }
+  label.lbl { display: block; font-size: 14px; font-weight: 800; margin-bottom: 8px; }
+  .field.big { font-size: 20px; font-weight: 700; padding: 14px 16px; }
+  .card .hint { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 8px 0 18px; }
+  .btn.block { width: 100%; padding: 16px; font-size: 17px; border-radius: 16px; }
+  .card .err { color: var(--danger); font-size: 14px; font-weight: 600; margin: -6px 0 14px; }
+  .err:empty { display: none; }
+  .muted { color: var(--muted); font-size: 14px; text-align: center; margin: 0; }
+  .muted b { color: var(--b-blue); }
+
+  .badge-ok { width: 64px; height: 64px; margin: 4px auto 12px; border-radius: 50%; background: var(--b-sky); color: var(--b-blue); display: grid; place-items: center; }
+  .badge-ok svg { width: 34px; height: 34px; }
+  .card h2 { margin: 0 0 8px; font-size: 22px; font-weight: 900; letter-spacing: -0.02em; }
+  .card p { margin: 0; color: var(--ink-2); line-height: 1.55; font-size: 15px; }
+  .me { display: inline-block; margin: 6px 0 14px; padding: 8px 16px; border-radius: 999px; background: var(--b-sky); color: var(--b-blue-700); font-weight: 800; font-size: 18px; }
+
+  .qhead { display: flex; align-items: center; gap: 8px; }
+  .qbadge { background: var(--b-blue); color: #fff; font-weight: 900; font-size: 15px; border-radius: 10px; padding: 5px 10px; }
+  .qof { font-weight: 800; color: var(--muted); font-size: 15px; }
+  .qscore { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--ink-2); background: #fff; border-radius: 999px; padding: 6px 12px; box-shadow: var(--shadow); }
+  .qtext { font-size: 22px; line-height: 1.4; font-weight: 800; letter-spacing: -0.02em; margin: 2px 0 0; color: var(--b-navy); }
+  .opts { display: grid; gap: 10px; }
+  .opts.ox { grid-template-columns: 1fr 1fr; }
+  .opt {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    background: #fff; border: 2px solid var(--line); border-radius: 16px; padding: 14px 14px; font-size: 17px; font-weight: 700;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s, opacity 0.2s;
+  }
+  .opts.ox .opt { flex-direction: column; justify-content: center; padding: 18px 10px; font-size: 44px; font-weight: 900; }
+  .opts.ox .opt .num { display: none; }
+  .opt:active:not(:disabled) { transform: scale(0.98); }
+  .opt .num { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--b-sky); color: var(--b-blue); display: grid; place-items: center; font-size: 15px; font-weight: 900; }
+  .opt .txt { flex: 1; }
+  .opt .tag { flex: none; font-size: 12px; font-weight: 800; border-radius: 999px; padding: 4px 8px; background: var(--page); color: var(--ink-2); }
+  .opts.ox .opt .tag { font-size: 12px; }
+  .opt.sel { border-color: var(--b-blue); background: var(--b-sky); }
+  .opt.sel .num { background: var(--b-blue); color: #fff; }
+  .opt:disabled { cursor: default; color: inherit; }
+  .locked .opt:not(.sel) { opacity: 0.45; }
+  .reveal .opt { opacity: 0.5; }
+  .reveal .opt.right { opacity: 1; border-color: var(--b-blue); background: var(--b-blue); color: #fff; }
+  .reveal .opt.right .num { background: #fff; color: var(--b-blue); }
+  .reveal .opt.right .tag { background: rgba(255, 255, 255, 0.2); color: #fff; }
+  .reveal .opt.mine:not(.right) { opacity: 1; border-color: #c9d1e3; border-style: dashed; }
+
+  .state { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 16px; background: var(--b-sky); color: var(--b-blue-700); font-weight: 700; font-size: 15px; }
+  .state .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--b-blue); animation: blink 1s infinite; flex: none; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+
+  .result { border-radius: 20px; padding: 18px; text-align: center; }
+  .result.good { background: var(--b-blue); color: #fff; }
+  .result.bad { background: #fff; border: 2px solid var(--line); }
+  .result b { display: block; font-size: 24px; font-weight: 900; }
+  .result span { display: block; margin-top: 4px; font-size: 14px; opacity: 0.85; font-weight: 600; }
+  .explain { background: #fff; border-left: 5px solid var(--b-blue); border-radius: 12px; padding: 12px 14px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+
+  .score { font-size: 18px; font-weight: 700; color: var(--ink-2); margin: 10px 0 14px; }
+  .score b { font-size: 56px; font-weight: 900; color: var(--b-blue); letter-spacing: -0.03em; }
+
+  .win { position: relative; overflow: hidden; background: linear-gradient(150deg, var(--b-blue), var(--b-navy)); color: #fff; text-align: center; padding: 32px 20px; }
+  .win::before { content: ''; position: absolute; inset: -40% -20% auto auto; width: 260px; height: 260px; border-radius: 50%; background: rgba(255, 207, 63, 0.18); }
+  .win .rank { display: inline-block; font-size: 13px; font-weight: 800; background: rgba(255, 255, 255, 0.16); border-radius: 999px; padding: 6px 12px; position: relative; }
+  .win h2 { color: var(--gold); font-size: 26px; margin: 14px 0 6px; position: relative; }
+  .win .name { font-size: 40px; font-weight: 900; letter-spacing: -0.03em; position: relative; word-break: break-all; }
+  .win p { color: rgba(255, 255, 255, 0.85); margin-top: 12px; position: relative; }
+
+  footer.me-bar { text-align: center; font-size: 13px; color: var(--muted); padding: 0 16px calc(18px + env(safe-area-inset-bottom)); }
+  footer.me-bar b { color: var(--ink-2); }
+  footer.me-bar button { border: 0; background: none; color: var(--muted); text-decoration: underline; font-size: 12px; margin-left: 6px; }
+</style>
+</head>
+<body>
+<header class="top"><b id="topTitle">본사2지부 문화행사</b><span id="topCount"></span></header>
+<main id="app"><div class="card center"><p>불러오는 중…</p></div></main>
+<footer class="me-bar" id="meBar"></footer>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script type="module">
+import { rpc, watchState, escapeHtml as h } from './assets/api.js';
+
+const TOKEN_KEY = 'hq2quiz.token';
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
+};
+const app = document.getElementById('app');
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+let token = store.get(TOKEN_KEY);
+let me = null;        // quiz_me 응답
+let pub = null;       // 참여 전 공개 상태
+let viewKey = '';
+let picked = null;    // 제출 전 고른 보기 { qno, i }
+let sending = false;
+let celebrated = false;
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+// ───────── 데이터 ─────────
+let inflight = false, again = false;
+async function load() {
+  if (inflight) { again = true; return; }
+  inflight = true;
+  try {
+    if (token) {
+      const r = await rpc('quiz_me', { p_token: token });
+      if (r.ok) { me = r; }
+      else { token = null; me = null; store.set(TOKEN_KEY, null); }
+    }
+    if (!token) pub = await rpc('quiz_public_state');
+    render();
+  } catch {
+    // 잠깐 끊겨도 다음 확인 때 다시 시도한다
+  } finally {
+    inflight = false;
+    if (again) { again = false; load(); }
+  }
+}
+
+// ───────── 화면 ─────────
+function render() {
+  const s = me ? me.state : pub;
+  if (!s) return;
+  document.getElementById('topTitle').textContent = s.title;
+  document.title = `${s.title} 퀴즈`;
+  document.getElementById('topCount').textContent = me ? `${me.nickname}` : `${pub.participants}명 참여 중`;
+  document.getElementById('meBar').innerHTML = me ? `내 아이디 <b>${h(me.nickname)}</b>` : '';
+
+  if (!me) return show('join', joinView);
+  if (me.win_rank) return show(`win${me.win_rank}`, winView);
+  if (s.stage === 'cover') return show('wait', waitView);
+  if (s.stage === 'q' && me.question) {
+    const q = me.question;
+    const mode = s.revealed ? 'reveal' : q.my_choice != null ? 'locked' : 'open';
+    return show(`q${q.no}-${mode}`, questionView);
+  }
+  return show(`done-${s.stage}-${me.score}`, doneView);
+}
+
+function show(key, view) {
+  if (key === viewKey) return;
+  viewKey = key;
+  app.innerHTML = `<div class="view">${view()}</div>`;
+}
+
+function joinView() {
+  return `
+    <div class="hero">
+      <div class="eyebrow">실시간 참여 퀴즈</div>
+      <h1>${h(pub.title)}</h1>
+      <p>${h(pub.subtitle)}</p>
+    </div>
+    <form class="card" id="joinForm" novalidate>
+      <label class="lbl" for="nick">참여 아이디</label>
+      <input class="field big" id="nick" maxlength="12" autocomplete="nickname" enterkeyhint="go" placeholder="예: 홍길동" required>
+      <p class="hint">추첨 화면에 이 아이디가 크게 표시돼요.<br>다른 사람과 겹치지 않게 입력해 주세요. (최대 12자)</p>
+      <p class="err" id="joinErr"></p>
+      <button class="btn block" type="submit">참여하기</button>
+    </form>
+    <p class="muted">지금 <b>${pub.participants}명</b> 참여 중</p>`;
+}
+
+function waitView() {
+  return `
+    <div class="card center">
+      <div class="badge-ok">${CHECK}</div>
+      <h2>참여 완료!</h2>
+      <div class="me">${h(me.nickname)}</div>
+      <p>곧 퀴즈가 시작돼요.<br>앞 화면을 봐 주세요.</p>
+    </div>
+    <p class="muted">화면을 끄지 말고 기다려 주세요. 문제가 나오면 자동으로 바뀌어요.</p>`;
+}
+
+function questionView() {
+  const s = me.state;
+  const q = me.question;
+  const ox = q.options.every((o) => o.length <= 2);
+  const revealed = s.revealed;
+  const locked = q.my_choice != null;
+  const sel = locked ? q.my_choice : picked && picked.qno === q.no ? picked.i : null;
+  let tail;
+  if (revealed) {
+    const right = q.my_choice === q.answer;
+    tail = q.my_choice == null
+      ? `<div class="result bad"><b>응답하지 않았어요</b><span>다음 문제는 꼭 풀어 보세요!</span></div>`
+      : right
+        ? `<div class="result good"><b>정답이에요!</b><span>지금까지 ${me.score}개 맞혔어요</span></div>`
+        : `<div class="result bad"><b>아쉬워요</b><span>정답은 ${q.answer + 1}번이에요 · 지금까지 ${me.score}개 정답</span></div>`;
+    if (q.explanation) tail += `<div class="explain">${h(q.explanation)}</div>`;
+    tail += `<p class="muted">다음 문제를 기다려 주세요</p>`;
+  } else if (locked) {
+    tail = `<div class="state"><span class="dot"></span>제출 완료! 정답 공개를 기다려 주세요</div>`;
+  } else {
+    tail = `<button class="btn block" id="submitBtn" ${sel == null ? 'disabled' : ''}>제출하기</button>
+            <p class="muted">제출하면 바꿀 수 없어요</p>`;
+  }
+  return `
+    <div class="qhead"><span class="qbadge">Q${q.no}</span><span class="qof">/ ${s.total}</span><span class="qscore">정답 ${me.score}개</span></div>
+    <h2 class="qtext">${h(q.question)}</h2>
+    <div class="opts${ox ? ' ox' : ''}${revealed ? ' reveal' : locked ? ' locked' : ''}" id="opts">
+      ${q.options.map((o, i) => {
+        const cls = [sel === i ? 'sel' : '', revealed && i === q.answer ? 'right' : '', i === q.my_choice ? 'mine' : ''].join(' ');
+        const tag = revealed && i === q.my_choice ? '<span class="tag">내 선택</span>' : '';
+        return `<button class="opt ${cls}" data-i="${i}" ${locked || revealed ? 'disabled' : ''}><span class="num">${i + 1}</span><span class="txt">${h(o)}</span>${tag}</button>`;
+      }).join('')}
+    </div>
+    ${tail}`;
+}
+
+function doneView() {
+  const s = me.state;
+  const msg = s.stage === 'draw'
+    ? '지금 경품 추첨이 진행 중이에요.<br>앞 화면을 봐 주세요!'
+    : s.stage === 'end'
+      ? '함께해 주셔서 감사합니다.'
+      : '곧 경품 추첨이 시작돼요.<br>앞 화면을 봐 주세요!';
+  return `
+    <div class="card center">
+      <h2>퀴즈 끝!</h2>
+      <div class="score"><b>${me.score}</b> / ${s.total} 정답</div>
+      <p>${msg}</p>
+    </div>`;
+}
+
+function winView() {
+  if (!celebrated) {
+    celebrated = true;
+    navigator.vibrate?.([120, 80, 120, 80, 240]);
+  }
+  return `
+    <div class="card win">
+      <span class="rank">${me.win_rank}번째 당첨</span>
+      <h2>당첨을 축하합니다!</h2>
+      <div class="name">${h(me.nickname)}</div>
+      <p>진행자에게 이 화면을 보여주고<br>경품을 받아 가세요.</p>
+    </div>
+    <p class="muted">퀴즈 점수 ${me.score} / ${me.state.total}</p>`;
+}
+
+// ───────── 입력 ─────────
+app.addEventListener('submit', async (e) => {
+  if (e.target.id !== 'joinForm') return;
+  e.preventDefault();
+  const nick = document.getElementById('nick').value.trim();
+  const err = document.getElementById('joinErr');
+  if (!nick) { err.textContent = '아이디를 입력해 주세요.'; return; }
+  if (sending) return;
+  sending = true;
+  e.target.querySelector('button').disabled = true;
+  try {
+    const r = await rpc('quiz_join', { p_nickname: nick });
+    token = r.token;
+    store.set(TOKEN_KEY, token);
+    viewKey = '';
+    await load();
+  } catch (ex) {
+    err.textContent = ex.message;
+    e.target.querySelector('button').disabled = false;
+  } finally {
+    sending = false;
+  }
+});
+
+app.addEventListener('click', async (e) => {
+  const opt = e.target.closest('.opt');
+  if (opt && !opt.disabled && me?.question) {
+    picked = { qno: me.question.no, i: Number(opt.dataset.i) };
+    document.querySelectorAll('#opts .opt').forEach((b) => b.classList.toggle('sel', b === opt));
+    document.getElementById('submitBtn').disabled = false;
+    return;
+  }
+  if (e.target.id === 'submitBtn' && picked && me?.question && !sending) {
+    sending = true;
+    e.target.disabled = true;
+    try {
+      await rpc('quiz_answer', { p_token: token, p_qno: picked.qno, p_choice: picked.i });
+    } catch (ex) {
+      toast(ex.message);
+    } finally {
+      sending = false;
+      await load();
+    }
+  }
+});
+
+watchState(load);
+</script>
+</body>
+</html>
