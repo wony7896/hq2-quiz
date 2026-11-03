@@ -775,8 +775,10 @@ const VIEWS = {
         name = mine[mine.length - 1].nickname;
         hint = `당첨을 축하합니다! · <kbd>→</kbd> ${after}`;
       } else if (qd && !pool.length) {
-        name = '정답자 없음';
-        hint = `이번 문제는 추첨할 정답자가 없어요 · <kbd>→</kbd> ${after}`;
+        const cur = currentOf(st);
+        const correctN = cur ? cur.answers.filter((a) => a.choice === cur.answer).length : 0;
+        name = correctN ? '추첨 대상 없음' : '정답자 없음';
+        hint = `${correctN ? `정답자 ${correctN}명이 모두 이미 당첨됐어요` : '이번 문제는 맞힌 사람이 없어요'} · <kbd>→</kbd> ${after}`;
       }
       const nameEl = root.querySelector('[data-slot-name]');
       if (nameEl.dataset.v !== name) {
