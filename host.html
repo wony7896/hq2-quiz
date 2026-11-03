@@ -1187,9 +1187,32 @@ function roulette(pool, winner, poolSize) {
     ctx.fillStyle = '#0b1f5b';
     ctx.fillText(name, 0, 4);
     ctx.restore();
-    ctx.fillStyle = '#44516f';
-    ctx.font = `700 32px ${CANVAS_FONT}`;
-    ctx.fillText(`추첨 대상 ${poolSize}명`, PX, PY + PH / 2 + 60);
+    // 추첨 대상 인원: 남색 알약 안에 숫자를 금색으로 크게
+    const pre = '추첨 대상 ', num = String(poolSize), post = '명';
+    const fLabel = `800 44px ${CANVAS_FONT}`, fNum = `900 64px ${CANVAS_FONT}`;
+    ctx.font = fLabel;
+    const wPre = ctx.measureText(pre).width, wPost = ctx.measureText(post).width;
+    ctx.font = fNum;
+    const wNum = ctx.measureText(num).width + 8;
+    const bw = wPre + wNum + wPost + 72, by = PY + PH / 2 + 100;
+    ctx.fillStyle = '#0b1f5b';
+    ctx.beginPath();
+    ctx.roundRect(PX - bw / 2, by - 50, bw, 100, 50);
+    ctx.fill();
+    let x = PX - bw / 2 + 36;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = fLabel;
+    ctx.fillText(pre, x, by + 2);
+    x += wPre;
+    ctx.fillStyle = '#ffcf3f';
+    ctx.font = fNum;
+    ctx.fillText(num, x + 4, by + 2);
+    x += wNum;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = fLabel;
+    ctx.fillText(post, x, by + 2);
+    ctx.textAlign = 'center';
   };
 
   return new Promise((resolve) => {
