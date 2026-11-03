@@ -94,6 +94,7 @@
 
   footer.me-bar { text-align: center; font-size: 13px; color: var(--muted); padding: 0 16px calc(18px + env(safe-area-inset-bottom)); }
   footer.me-bar b { color: var(--ink-2); }
+  footer.me-bar b.won { color: var(--b-blue); }
   footer.me-bar button { border: 0; background: none; color: var(--muted); text-decoration: underline; font-size: 12px; margin-left: 6px; }
 </style>
 </head>
@@ -160,17 +161,28 @@ function render() {
   document.getElementById('topTitle').textContent = s.title;
   document.title = `${s.title} 퀴즈`;
   document.getElementById('topCount').textContent = me ? `${me.nickname}` : `${pub.participants}명 참여 중`;
-  document.getElementById('meBar').innerHTML = me ? `내 아이디 <b>${h(me.nickname)}</b>` : '';
+  document.getElementById('meBar').innerHTML = me
+    ? `내 아이디 <b>${h(me.nickname)}</b>${me.win ? ' · <b class="won">당첨</b>' : ''}`
+    : '';
 
-  if (!me) return show('join', joinView);
-  if (me.win_rank) return show(`win${me.win_rank}`, winView);
+  if (!me) {
+    show('join', joinView);
+    const n = document.getElementById('joinCount');
+    if (n) n.textContent = `${pub.participants}명`;
+    return;
+  }
+  // 당첨 화면은 내가 뽑힌 추첨 화면과 마무리 화면에서만 크게 보여 준다 (다음 문제는 계속 풀 수 있게)
+  const w = me.win;
+  if (w && ((s.stage === 'qdraw' && w.qno === s.qno) || (s.stage === 'draw' && w.qno == null) || s.stage === 'end')) {
+    return show(`win-${w.qno}-${w.rank}`, winView);
+  }
   if (s.stage === 'cover') return show('wait', waitView);
-  if (s.stage === 'q' && me.question) {
+  if ((s.stage === 'q' || s.stage === 'qdraw') && me.question) {
     const q = me.question;
-    const mode = s.revealed ? 'reveal' : q.my_choice != null ? 'locked' : 'open';
+    const mode = s.stage === 'qdraw' ? 'draw' : s.revealed ? 'reveal' : q.my_choice != null ? 'locked' : 'open';
     return show(`q${q.no}-${mode}`, questionView);
   }
-  return show(`done-${s.stage}-${me.score}`, doneView);
+  return show(`done-${s.stage}-${me.score}-${w ? 'w' : ''}`, doneView);
 }
 
 function show(key, view) {
@@ -193,7 +205,7 @@ function joinView() {
       <p class="err" id="joinErr"></p>
       <button class="btn block" type="submit">참여하기</button>
     </form>
-    <p class="muted">지금 <b>${pub.participants}명</b> 참여 중</p>`;
+    <p class="muted">지금 <b id="joinCount">${pub.participants}명</b> 참여 중</p>`;
 }
 
 function waitView() {
@@ -214,16 +226,18 @@ function questionView() {
   const revealed = s.revealed;
   const locked = q.my_choice != null;
   const sel = locked ? q.my_choice : picked && picked.qno === q.no ? picked.i : null;
+  const right = q.my_choice === q.answer;
   let tail;
   if (revealed) {
-    const right = q.my_choice === q.answer;
     tail = q.my_choice == null
       ? `<div class="result bad"><b>응답하지 않았어요</b><span>다음 문제는 꼭 풀어 보세요!</span></div>`
       : right
         ? `<div class="result good"><b>정답이에요!</b><span>지금까지 ${me.score}개 맞혔어요</span></div>`
         : `<div class="result bad"><b>아쉬워요</b><span>정답은 ${q.answer + 1}번이에요 · 지금까지 ${me.score}개 정답</span></div>`;
     if (q.explanation) tail += `<div class="explain">${h(q.explanation)}</div>`;
-    tail += `<p class="muted">다음 문제를 기다려 주세요</p>`;
+    tail += s.stage === 'qdraw'
+      ? `<p class="muted">${right && !me.win ? '나도 추첨 후보예요! 앞 화면을 봐 주세요' : '정답자 추첨 중이에요. 앞 화면을 봐 주세요'}</p>`
+      : `<p class="muted">곧 정답자 추첨이 시작돼요</p>`;
   } else if (locked) {
     tail = `<div class="state"><span class="dot"></span>제출 완료! 정답 공개를 기다려 주세요</div>`;
   } else {
@@ -255,7 +269,12 @@ function doneView() {
       <h2>퀴즈 끝!</h2>
       <div class="score"><b>${me.score}</b> / ${s.total} 정답</div>
       <p>${msg}</p>
-    </div>`;
+    </div>
+    ${me.win ? `<p class="muted">${winLabel(me.win)}에 당첨됐어요. 경품을 꼭 받아 가세요!</p>` : ''}`;
+}
+
+function winLabel(w) {
+  return w.qno ? `Q${w.qno} 정답자 추첨` : `경품 추첨 ${w.rank}번째`;
 }
 
 function winView() {
@@ -265,7 +284,7 @@ function winView() {
   }
   return `
     <div class="card win">
-      <span class="rank">${me.win_rank}번째 당첨</span>
+      <span class="rank">${winLabel(me.win)} 당첨</span>
       <h2>당첨을 축하합니다!</h2>
       <div class="name">${h(me.nickname)}</div>
       <p>진행자에게 이 화면을 보여주고<br>경품을 받아 가세요.</p>

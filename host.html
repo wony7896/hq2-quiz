@@ -124,6 +124,11 @@
   .answered b { color: var(--ink); font-size: 40px; font-variant-numeric: tabular-nums; }
   .meter { width: 420px; height: 14px; border-radius: 7px; background: var(--b-sky-2); overflow: hidden; }
   .meter i { display: block; height: 100%; width: 0; background: var(--b-blue); border-radius: 7px; transition: width 0.6s; }
+  .voters { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; max-height: 106px; overflow: hidden; }
+  .voters:empty { display: none; }
+  .voters .chip { height: 48px; padding: 0 20px; font-size: 24px; }
+  .voters .chip.ok { background: var(--b-blue); border-color: var(--b-blue); color: #fff; }
+  .voters .chip.no { opacity: 0.4; }
   .key-hint { margin-left: auto; font-size: 26px; font-weight: 600; color: var(--muted); }
   .key-hint kbd { font: inherit; font-weight: 800; color: var(--ink-2); background: #fff; border: 2px solid var(--line); border-radius: 10px; padding: 2px 12px; margin-right: 8px; }
 
@@ -184,6 +189,8 @@
   @keyframes shake { 25% { transform: translate(-3px, 1px) rotate(-0.3deg); } 75% { transform: translate(3px, -1px) rotate(0.3deg); } }
   .slot.locked { border-color: var(--gold); box-shadow: 0 0 0 12px rgba(255, 207, 63, 0.35), 0 30px 80px rgba(11, 31, 91, 0.2); transform: scale(1.04); }
   .slot.locked .slot-name { color: var(--b-navy); }
+  .slot .again { margin-top: 20px; border: 0; background: var(--b-sky); color: var(--b-blue-700); font-size: 26px; font-weight: 800; padding: 12px 30px; border-radius: 999px; }
+  .slot .again:hover { background: var(--b-sky-2); }
 
   .winners { background: #fff; border-radius: 36px; padding: 34px 30px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 0; }
   .winners h3 { margin: 0 0 20px; font-size: 32px; font-weight: 800; display: flex; align-items: center; gap: 12px; }
@@ -191,7 +198,8 @@
   .winners ol { list-style: none; margin: 0; padding: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
   .winners li { display: flex; align-items: center; gap: 16px; font-size: 32px; font-weight: 800; padding: 10px 12px; border-radius: 18px; }
   .winners li:hover { background: var(--b-sky); }
-  .winners li i { flex: none; font-style: normal; width: 52px; height: 52px; border-radius: 50%; background: var(--b-blue); color: #fff; display: grid; place-items: center; font-size: 26px; }
+  .winners li i { flex: none; font-style: normal; min-width: 52px; height: 52px; padding: 0 12px; border-radius: 26px; background: var(--b-blue); color: #fff; display: grid; place-items: center; font-size: 26px; }
+  .winners li i.q { background: var(--b-sky); color: var(--b-blue-700); }
   .winners li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .winners li button { opacity: 0; border: 0; background: transparent; color: var(--muted); font-size: 22px; font-weight: 700; padding: 6px 10px; border-radius: 10px; }
   .winners li:hover button { opacity: 1; }
@@ -352,6 +360,7 @@ let navSeq = 0;
 let drawing = false;
 let overlayOpen = false;
 let seenIds = new Set();
+let voterSeen = new Set();
 let arenaSig = '';
 const drawPref = JSON.parse(store.get(DRAW_KEY) || '{"mode":"all","k":7}');
 
@@ -398,16 +407,19 @@ function buildSteps(n) {
   for (let i = 1; i <= n; i++) {
     list.push({ stage: 'q', qno: i, revealed: false });
     list.push({ stage: 'q', qno: i, revealed: true });
+    list.push({ stage: 'qdraw', qno: i });
   }
   list.push({ stage: 'result' }, { stage: 'draw' }, { stage: 'end' });
   return list;
 }
 function indexOfState(s) {
-  const i = steps.findIndex((st) => st.stage === s.stage && (st.stage !== 'q' || (st.qno === s.qno && st.revealed === s.revealed)));
+  const i = steps.findIndex((st) => st.stage === s.stage && (st.qno || 0) === (s.qno || 0)
+    && (st.stage !== 'q' || st.revealed === s.revealed));
   return i < 0 ? 0 : i;
 }
 function stepName(st) {
   if (!st) return '-';
+  if (st.stage === 'qdraw') return `Q${st.qno} 정답자 추첨`;
   return { cover: '표지 · QR', result: '퀴즈 결과', draw: '경품 추첨', end: '마무리' }[st.stage]
     || `Q${st.qno} ${st.revealed ? '정답 공개' : '응답 받는 중'}`;
 }
@@ -465,10 +477,12 @@ async function go(idx) {
 }
 function next() {
   const st = steps[stepIdx];
-  if (st?.stage === 'draw') {
-    if (overlayOpen) closeOverlay();
-    else if (!drawing) startDraw();
-    return;
+  if (st?.stage === 'draw' || st?.stage === 'qdraw') {
+    if (overlayOpen) { closeOverlay(); return; }
+    if (drawing) return;
+    // 문제 정답자 추첨은 한 명 뽑았거나 뽑을 사람이 없으면 다음 화면으로 넘어간다
+    const done = st.stage === 'qdraw' && (qWinners(st).length > 0 || drawPool(st).length === 0);
+    if (!done) { startDraw(); return; }
   }
   go(stepIdx + 1);
 }
@@ -562,12 +576,17 @@ const VIEWS = {
               </div>`).join('')}
           </div>
           <div class="explain${q.explanation ? ' has' : ''}">${h(q.explanation)}</div>
+          <div class="voters" data-voters></div>
           <footer class="q-foot">
             <span class="live"><i></i><span data-live></span></span>
             <div class="answered"><span><b data-ans>0</b> / <span data-total>0</span>명 응답</span><div class="meter"><i data-meter></i></div></div>
             <div class="key-hint" data-hint></div>
           </footer>
         </section>`;
+    },
+    mount(st) {
+      const cur = status.current && status.current.no === st.qno ? status.current : null;
+      voterSeen = new Set((cur?.answers || []).map((a) => a.id));
     },
     update(st) {
       const root = stageEl.querySelector('.question');
@@ -580,15 +599,14 @@ const VIEWS = {
       root.querySelector('[data-ans]').textContent = answered;
       root.querySelector('[data-total]').textContent = people;
       root.querySelector('[data-meter]').style.width = people ? `${Math.min(100, (answered / people) * 100)}%` : '0';
-      root.querySelector('[data-hint]').innerHTML = st.revealed
-        ? (st.qno < total() ? '<kbd>→</kbd>다음 문제' : '<kbd>→</kbd>결과 보기')
-        : '<kbd>→</kbd>정답 공개';
+      root.querySelector('[data-hint]').innerHTML = st.revealed ? '<kbd>→</kbd>정답자 추첨' : '<kbd>→</kbd>정답 공개';
       root.querySelectorAll('.opt').forEach((el, i) => {
         const c = counts[i] || 0;
         const pct = answered ? Math.round((c / answered) * 100) : 0;
         el.style.setProperty('--pct', `${pct}%`);
         el.querySelector('[data-stat]').textContent = `${c}명 · ${pct}%`;
       });
+      renderVoters(root.querySelector('[data-voters]'), cur ? cur.answers || [] : [], st.revealed && cur ? cur.answer : null);
     },
   },
 
@@ -629,17 +647,21 @@ const VIEWS = {
     },
   },
 
+  // 'draw' = 마지막 경품 추첨, 'qdraw' = n번 문제 정답자 추첨 (같은 화면을 함께 쓴다)
   draw: {
-    html: () => `
+    html: (st) => {
+      const qd = st.stage === 'qdraw';
+      return `
       <section class="slide draw">
         <div class="arena idle" data-arena></div>
         <header class="draw-head">
-          <h2 class="title">경품 추첨</h2>
-          <div class="pool-picker">
-            <button class="pill" data-mode="all">전체 참여자 <em data-all-n></em></button>
+          <h2 class="title">${qd ? `Q${st.qno} 정답자 추첨` : '경품 추첨'}</h2>
+          <div class="pool-picker">${qd
+            ? '<div class="pill on">정답자 <em data-correct-n></em></div>'
+            : `<button class="pill" data-mode="all">전체 참여자 <em data-all-n></em></button>
             <div class="pill" data-mode="min">정답
               <button class="step" data-k="-1" aria-label="기준 낮추기">−</button><b data-k-val></b><button class="step" data-k="1" aria-label="기준 높이기">+</button>
-              개 이상 <em data-min-n></em></div>
+              개 이상 <em data-min-n></em></div>`}
           </div>
         </header>
         <div class="draw-body">
@@ -647,7 +669,8 @@ const VIEWS = {
             <div class="slot" data-slot>
               <div class="slot-label">추첨 대상 <b data-pool-n>0</b>명</div>
               <div class="slot-name ready" data-slot-name>READY</div>
-              <div class="slot-hint" data-slot-hint><kbd>Space</kbd> 또는 <kbd>→</kbd> 를 누르면 추첨을 시작합니다</div>
+              <div class="slot-hint" data-slot-hint></div>
+              ${qd ? '<button class="again" data-again hidden>한 명 더 추첨</button>' : ''}
               <div class="slot-timer"><i data-timer></i></div>
             </div>
           </div>
@@ -659,12 +682,17 @@ const VIEWS = {
             <div class="win-rank" data-win-rank></div>
             <div class="win-label">축하합니다!</div>
             <div class="win-name" data-win-name></div>
-            <div class="win-hint">진행자에게 와 주세요 · <b>→</b> 다음 추첨</div>
+            <div class="win-hint">진행자에게 와 주세요 · <b>→</b> ${qd ? '계속' : '다음 추첨'}</div>
           </div>
         </div>
-      </section>`,
+      </section>`;
+    },
     mount() {
       const root = stageEl.querySelector('.draw');
+      root.querySelector('[data-again]')?.addEventListener('click', (e) => {
+        e.currentTarget.blur();
+        if (!drawing && !overlayOpen) startDraw();
+      });
       root.querySelectorAll('[data-mode]').forEach((el) => el.addEventListener('click', (e) => {
         if (drawing) return;
         const step = e.target.closest('[data-k]');
@@ -686,26 +714,56 @@ const VIEWS = {
         } catch (err) { toast(err.message); }
       });
     },
-    update() {
+    update(st) {
       if (drawing) return;
       const root = stageEl.querySelector('.draw');
-      drawPref.k = Math.max(1, Math.min(total() || 1, drawPref.k));
-      const ps = status.participants.filter((p) => !p.won);
-      const minN = ps.filter((p) => p.score >= drawPref.k).length;
-      root.querySelector('[data-all-n]').textContent = `${ps.length}명`;
-      root.querySelector('[data-min-n]').textContent = `${minN}명`;
-      root.querySelector('[data-k-val]').textContent = drawPref.k;
-      root.querySelectorAll('[data-mode]').forEach((el) => el.classList.toggle('on', el.dataset.mode === drawPref.mode));
-      const pool = drawPref.mode === 'all' ? ps : ps.filter((p) => p.score >= drawPref.k);
+      const qd = st.stage === 'qdraw';
+      const pool = drawPool(st);
+      if (qd) {
+        const cur = currentOf(st);
+        root.querySelector('[data-correct-n]').textContent = `${cur ? cur.answers.filter((a) => a.choice === cur.answer).length : 0}명`;
+      } else {
+        drawPref.k = Math.max(1, Math.min(total() || 1, drawPref.k));
+        const ps = status.participants.filter((p) => !p.won);
+        root.querySelector('[data-all-n]').textContent = `${ps.length}명`;
+        root.querySelector('[data-min-n]').textContent = `${ps.filter((p) => p.score >= drawPref.k).length}명`;
+        root.querySelector('[data-k-val]').textContent = drawPref.k;
+        root.querySelectorAll('[data-mode]').forEach((el) => el.classList.toggle('on', el.dataset.mode === drawPref.mode));
+      }
       root.querySelector('[data-pool-n]').textContent = pool.length;
 
       const ws = status.winners;
       root.querySelector('[data-win-n]').textContent = ws.length ? `${ws.length}명` : '';
       root.querySelector('[data-win-list]').innerHTML = ws.length
-        ? ws.map((w) => `<li><i>${w.rank}</i><span>${h(w.nickname)}</span><button data-remove="${w.id}" data-name="${h(w.nickname)}" title="당첨 취소">취소</button></li>`).join('')
+        ? ws.map((w) => `<li><i${w.qno ? ' class="q"' : ''}>${w.qno ? `Q${w.qno}` : w.rank}</i><span>${h(w.nickname)}</span><button data-remove="${w.id}" data-name="${h(w.nickname)}" title="당첨 취소">취소</button></li>`).join('')
         : '<li class="empty">아직 당첨자가 없어요.<br>추첨을 시작해 보세요!</li>';
 
       if (overlayOpen) return;
+      // 추첨 상자: 대기 / 이 문제 당첨자 / 정답자 없음
+      const mine = qd ? qWinners(st) : [];
+      const after = st.qno < total() ? '다음 문제' : '퀴즈 결과';
+      let name = 'READY';
+      let hint = `<kbd>Space</kbd> 또는 <kbd>→</kbd> 를 누르면 ${qd ? '정답자 중 한 명을 추첨합니다' : ws.some((w) => !w.qno) ? '다음 추첨을 시작합니다' : '추첨을 시작합니다'}`;
+      if (mine.length) {
+        name = mine[mine.length - 1].nickname;
+        hint = `당첨을 축하합니다! · <kbd>→</kbd> ${after}`;
+      } else if (qd && !pool.length) {
+        name = '정답자 없음';
+        hint = `이번 문제는 추첨할 정답자가 없어요 · <kbd>→</kbd> ${after}`;
+      }
+      const nameEl = root.querySelector('[data-slot-name]');
+      if (nameEl.dataset.v !== name) {
+        nameEl.dataset.v = name;
+        nameEl.textContent = name;
+        nameEl.classList.toggle('ready', !mine.length);
+        if (mine.length) fitName(nameEl, name, 150, 960);
+        else nameEl.style.fontSize = '';
+      }
+      const hintEl = root.querySelector('[data-slot-hint]');
+      if (hintEl.innerHTML !== hint) hintEl.innerHTML = hint;
+      const again = root.querySelector('[data-again]');
+      if (again) again.hidden = !(mine.length && pool.length);
+
       const sig = pool.map((p) => p.id).join();
       if (sig !== arenaSig) {
         arenaSig = sig;
@@ -731,6 +789,52 @@ const VIEWS = {
     },
   },
 };
+
+VIEWS.qdraw = VIEWS.draw;
+
+function currentOf(st) {
+  return status.current && status.current.no === st.qno ? status.current : null;
+}
+function qWinners(st) {
+  return status.winners.filter((w) => w.qno === st.qno);
+}
+// 추첨 후보: 문제 정답자 추첨이면 그 문제를 맞힌 사람, 아니면 고른 조건의 참여자 (이미 당첨된 사람 제외)
+function drawPool(st) {
+  if (st.stage === 'qdraw') {
+    const cur = currentOf(st);
+    if (!cur) return [];
+    const won = new Set(status.participants.filter((p) => p.won).map((p) => p.id));
+    return cur.answers.filter((a) => a.choice === cur.answer && !won.has(a.id));
+  }
+  const ps = status.participants.filter((p) => !p.won);
+  return drawPref.mode === 'all' ? ps : ps.filter((p) => p.score >= drawPref.k);
+}
+
+// 응답한 사람 아이디: 응답 중에는 최근 순, 정답 공개 뒤에는 맞힌 사람(파랑) 먼저
+function renderVoters(el, answers, answer) {
+  const list = answer == null
+    ? [...answers].reverse()
+    : [...answers.filter((a) => a.choice === answer), ...answers.filter((a) => a.choice !== answer)];
+  const sig = `${answer}|${list.map((a) => a.id).join()}`;
+  if (el.dataset.sig === sig) return;
+  el.dataset.sig = sig;
+  const cls = (a) => (answer == null ? (voterSeen.has(a.id) ? '' : ' new') : a.choice === answer ? ' ok' : ' no');
+  const shown = list.slice(0, 80);
+  el.innerHTML = shown.map((a) => `<span class="chip${cls(a)}">${h(a.nickname)}</span>`).join('')
+    + '<span class="chip more" hidden></span>';
+  answers.forEach((a) => voterSeen.add(a.id));
+  // 두 줄에 다 안 들어가면 뒤쪽 아이디를 '외 N명'으로 묶는다
+  const more = el.lastElementChild;
+  const chips = [...el.children].slice(0, -1);
+  let rest = list.length - shown.length;
+  const setMore = () => { more.hidden = rest === 0; more.textContent = `외 ${rest}명`; };
+  setMore();
+  while (chips.length && el.scrollHeight > el.clientHeight + 1) {
+    chips.pop().remove();
+    rest++;
+    setMore();
+  }
+}
 
 function barChart(dist) {
   const W = 1080, H = 560, L = 64, R = 16, T = 40, B = 64;
@@ -790,13 +894,18 @@ function fitName(el, name, base, width) {
 }
 
 async function startDraw() {
-  const ps = status.participants.filter((p) => !p.won);
-  const pool = drawPref.mode === 'all' ? ps : ps.filter((p) => p.score >= drawPref.k);
-  if (!pool.length) { toast('추첨 대상이 없어요. 대상 조건을 바꿔 보세요.'); return; }
+  const st = steps[stepIdx];
+  const qd = st.stage === 'qdraw';
+  if (!drawPool(st).length) {
+    toast(qd ? '추첨할 정답자가 없어요.' : '추첨 대상이 없어요. 대상 조건을 바꿔 보세요.');
+    return;
+  }
   drawing = true;
   let res;
   try {
-    res = await rpc('quiz_admin_draw', { p_pin: pin, p_min_score: drawPref.mode === 'all' ? 0 : drawPref.k });
+    res = await rpc('quiz_admin_draw', qd
+      ? { p_pin: pin, p_qno: st.qno }
+      : { p_pin: pin, p_min_score: drawPref.mode === 'all' ? 0 : drawPref.k });
   } catch (e) {
     drawing = false;
     toast(e.message);
@@ -812,6 +921,8 @@ async function startDraw() {
   showWinner(res.winner);
   drawing = false;
   refresh();
+  // 당첨자 휴대폰이 연출이 끝나자마자 당첨 화면으로 바뀌도록 실시간 알림을 보낸다
+  setTimeout(() => rpc('quiz_admin_touch', { p_pin: pin }).catch(() => {}), 900);
 }
 
 function shuffle(pool, winner, poolSize) {
@@ -882,7 +993,7 @@ function shuffle(pool, winner, poolSize) {
 function showWinner(w) {
   const root = stageEl.querySelector('.draw');
   const ov = root.querySelector('[data-overlay]');
-  root.querySelector('[data-win-rank]').textContent = `${w.rank}번째 당첨`;
+  root.querySelector('[data-win-rank]').textContent = w.qno ? `Q${w.qno} 정답자 추첨 당첨` : `${w.rank}번째 당첨`;
   const nameEl = root.querySelector('[data-win-name]');
   nameEl.textContent = w.nickname;
   fitName(nameEl, w.nickname, 220, 1700);
@@ -898,11 +1009,8 @@ function closeOverlay() {
   root.querySelector('[data-overlay]').hidden = true;
   const slot = root.querySelector('[data-slot]');
   slot.classList.remove('locked', 'spinning');
-  const nameEl = root.querySelector('[data-slot-name]');
-  nameEl.className = 'slot-name ready';
-  nameEl.style.fontSize = '';
-  nameEl.textContent = 'READY';
-  root.querySelector('[data-slot-hint]').innerHTML = '<kbd>Space</kbd> 또는 <kbd>→</kbd> 를 누르면 다음 추첨을 시작합니다';
+  // 추첨 상자 글자는 update()가 상황에 맞게 다시 채운다
+  root.querySelector('[data-slot-name]').dataset.v = '';
   root.querySelector('[data-timer]').style.width = '0';
   arenaSig = '';
   render();
