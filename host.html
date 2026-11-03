@@ -977,8 +977,8 @@ async function startDraw() {
   setTimeout(() => rpc('quiz_admin_touch', { p_pin: pin }).catch(() => {}), 900);
 }
 
-// 룰렛: 참여자 아이디가 적힌 판이 빠르게 돌다가 점점 느려지고, 위쪽 바늘이 칸을 넘길 때마다 튕긴다.
-// 멈춘 칸이 금색으로 빛나면 당첨 (약 5초)
+// 룰렛: 참여자 아이디가 적힌 판이 3.5초 동안 빠르게 돌고, 마지막 3초는 칸을 넘길 때마다 점점 더 느려진다.
+// 바늘은 칸 사이 못에 걸려 휘었다가 풀리며 튕긴다. 멈춘 칸이 금색으로 빛나면 당첨 (약 7초)
 const WHEEL_COLORS = [
   { fill: '#1d57e6', text: '#fff' },
   { fill: '#ffffff', text: '#0b1f5b' },
@@ -1058,15 +1058,30 @@ function roulette(pool, winner, poolSize) {
   const plain = wheelImage(names, colors, R, k);
   const lit = wheelImage(names, colors.map((c, i) => (i === w ? WHEEL_GOLD : c)), R, k);
 
-  // 바늘(위쪽)이 당첨 칸 안의 아무 곳에서 멈추도록 5바퀴 남짓 돌린다
-  const SPIN = 4600, END = 5300;
+  // 바늘(위쪽)이 멈추는 곳: 당첨 칸에 겨우 넘어 들어왔거나, 다음 칸으로 넘어갈 듯 말 듯 걸린 곳
+  const FAST = 3500, SLOW = 3000, SPIN = FAST + SLOW, END = SPIN + 700;
   const th0 = rand(0, TAU);
-  const target = -Math.PI / 2 - (w + rand(0.15, 0.85)) * seg;
+  const f = Math.random() < 0.5 ? rand(0.76, 0.9) : rand(0.1, 0.22);
+  const target = -Math.PI / 2 - (w + f) * seg;
   const thEnd = th0 + TAU * 5 + ((((target - th0) % TAU) + TAU) % TAU);
-  const ease = (x) => 1 - (1 - x) ** 2.6;
-  const under = (th) => Math.floor(((((-Math.PI / 2 - th) % TAU) + TAU) % TAU) / seg);
+  // 마지막 3초에 4~5칸만 지나가도록 나누고, 두 구간의 속도가 끊김 없이 이어지게 한다
+  const dSlow = Math.min(4.5 * seg, 2.6);
+  const dFast = thEnd - th0 - dSlow;
+  const Ta = FAST / 1000;
+  const wB = (3 * dSlow) / (SLOW / 1000);
+  const wA = wB + (3 * (dFast - wB * Ta)) / Ta;
+  const angleAt = (t) => {
+    if (t <= FAST) {
+      const sec = t / 1000;
+      return th0 + wB * sec + ((wA - wB) * Ta / 3) * (1 - (1 - sec / Ta) ** 3);
+    }
+    const u = Math.min(1, (t - FAST) / SLOW);
+    return th0 + dFast + dSlow * (1 - (1 - u) ** 3);
+  };
+  // 바늘 아래 칸 위치 (정수 부분 = 칸 번호, 소수 부분이 0에 가까울수록 다음 못에 닿는다)
+  const posAt = (th) => ((((-Math.PI / 2 - th) % TAU) + TAU) % TAU) / seg;
 
-  const draw = (t, th, kick) => {
+  const draw = (t, th, needle) => {
     ctx.setTransform(k, 0, 0, k, 0, 0);
     ctx.clearRect(0, 0, 1920, 1080);
     const stopped = t >= SPIN;
@@ -1119,7 +1134,7 @@ function roulette(pool, winner, poolSize) {
     // 바늘: 칸을 넘길 때마다 판이 도는 쪽으로 튕긴다
     ctx.save();
     ctx.translate(CX, CY - R - 44);
-    ctx.rotate(-kick * 0.42);
+    ctx.rotate(needle);
     ctx.shadowColor = 'rgba(11, 31, 91, 0.35)';
     ctx.shadowBlur = 12;
     ctx.shadowOffsetY = 4;
@@ -1141,21 +1156,26 @@ function roulette(pool, winner, poolSize) {
     ctx.restore();
     ctx.fillStyle = '#44516f';
     ctx.font = `700 34px ${CANVAS_FONT}`;
-    ctx.fillText(stopped ? '당첨자가 나왔어요!' : `추첨 대상 ${poolSize}명 · 두구두구…`, CX, CY + R + RIM + 55);
+    ctx.fillText(stopped ? '당첨자가 나왔어요!' : t < FAST ? `추첨 대상 ${poolSize}명 · 두구두구…` : '과연 누가…?', CX, CY + R + RIM + 55);
   };
 
   return new Promise((resolve) => {
     const t0 = performance.now();
-    let last = t0, idx = under(th0), kick = 0;
+    let last = t0, idx = Math.floor(posAt(th0)), osc = 0, oscV = 0, needle = 0;
     const frame = (now) => {
       const t = now - t0;
       const dt = Math.min(1 / 30, (now - last) / 1000);
       last = now;
-      const th = th0 + (thEnd - th0) * ease(Math.min(1, t / SPIN));
-      const cur = under(th);
-      if (cur !== idx) { idx = cur; kick = 1; }
-      kick *= Math.exp(-dt * 14);
-      draw(t, th, kick);
+      const th = angleAt(t);
+      const pos = posAt(th);
+      const cur = Math.floor(pos);
+      // 못에 가까워질수록 바늘이 판이 도는 쪽으로 휘고, 못을 넘기면 풀리며 흔들린다
+      const bend = Math.max(0, (0.3 - (pos - cur)) / 0.3);
+      if (cur !== idx) { idx = cur; osc = needle; oscV = 0; }
+      oscV += (-300 * osc - 12 * oscV) * dt;
+      osc += oscV * dt;
+      needle = -0.38 * bend + osc;
+      draw(t, th, needle);
       if (t < END) requestAnimationFrame(frame);
       else resolve();
     };
