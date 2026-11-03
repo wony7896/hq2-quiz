@@ -156,10 +156,6 @@
   .arena .chip { position: absolute; left: 0; top: 0; opacity: 0.32; will-change: transform; }
   .arena.idle .chip { animation: drift 6s ease-in-out infinite alternate; }
   @keyframes drift { to { translate: 18px -22px; } }
-  .arena.mixing .chip { opacity: 1; border-color: var(--b-blue); box-shadow: 0 10px 24px rgba(11, 31, 91, 0.16); }
-  .arena.mixing .chip:nth-child(3n) { background: var(--b-blue); color: #fff; }
-  .arena.mixing .chip:nth-child(5n) { background: var(--b-navy); color: #fff; border-color: var(--b-navy); }
-  .arena.settle .chip { opacity: 0; transition: opacity 0.45s ease-in, transform 0.45s ease-in !important; }
   .draw-head { position: relative; z-index: 2; display: flex; align-items: center; gap: 40px; }
   .pool-picker { margin-left: auto; display: flex; gap: 16px; }
   .pill { display: inline-flex; align-items: center; gap: 14px; height: 76px; padding: 0 30px; border-radius: 999px; border: 3px solid var(--b-sky-2); background: #fff; font-size: 30px; font-weight: 800; color: var(--ink-2); }
@@ -183,13 +179,6 @@
   .slot-name.ready { color: var(--b-sky-3); font-size: 120px; }
   .slot-hint { font-size: 30px; font-weight: 600; color: var(--muted); }
   .slot-hint kbd { font: inherit; font-weight: 800; color: var(--ink-2); background: var(--b-sky); border-radius: 10px; padding: 4px 14px; margin: 0 4px; }
-  .slot-timer { height: 14px; border-radius: 7px; background: var(--b-sky); overflow: hidden; margin-top: 30px; }
-  .slot-timer i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--b-blue), #5b8cff); border-radius: 7px; }
-  .slot.spinning { border-color: var(--b-blue); animation: shake 0.18s infinite; }
-  .slot.spinning .slot-name { color: var(--b-blue); }
-  @keyframes shake { 25% { transform: translate(-3px, 1px) rotate(-0.3deg); } 75% { transform: translate(3px, -1px) rotate(0.3deg); } }
-  .slot.locked { border-color: var(--gold); box-shadow: 0 0 0 12px rgba(255, 207, 63, 0.35), 0 30px 80px rgba(11, 31, 91, 0.2); transform: scale(1.04); }
-  .slot.locked .slot-name { color: var(--b-navy); }
   .draw.qd .draw-body { grid-template-columns: 1fr; }
   .slot-wrap { min-height: 0; }
   .slot-wrap.show-roster .slot, .slot-wrap:not(.show-roster) .roster-box { display: none; }
@@ -216,6 +205,9 @@
   .winners li button:hover { background: #fff; color: var(--danger); }
   .winners .empty { font-size: 26px; color: var(--muted); font-weight: 600; line-height: 1.5; }
 
+  .lotto { position: absolute; inset: 0; z-index: 5; width: 1920px; height: 1080px; pointer-events: none; }
+  .lotto[hidden] { display: none; }
+  .draw.lotto-on .draw-body, .draw.lotto-on .arena { visibility: hidden; }
   .win-overlay {
     position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; text-align: center; color: #fff;
     background: radial-gradient(circle at 50% 40%, #3d77ff, var(--b-navy) 72%);
@@ -688,11 +680,11 @@ const VIEWS = {
                 <button class="again" data-again>한 명 더 추첨</button>
                 <button class="again" data-cancel>당첨 취소</button>
               </div>` : ''}
-              <div class="slot-timer"><i data-timer></i></div>
             </div>
           </div>
           ${qd ? '' : '<aside class="winners"><h3>당첨자 <small data-win-n></small></h3><ol data-win-list></ol></aside>'}
         </div>
+        <canvas class="lotto" data-lotto hidden></canvas>
         <div class="win-overlay" data-overlay hidden>
           <canvas width="1920" height="1080" data-confetti></canvas>
           <div class="win-card">
@@ -923,19 +915,14 @@ function barChart(dist) {
 }
 
 // ───────── 추첨 연출 ─────────
-function chipEls(names, cls = '') {
+function chipEls(names) {
   const arena = stageEl.querySelector('[data-arena]');
-  arena.innerHTML = names.map((n) => `<span class="chip ${cls}">${h(n)}</span>`).join('');
+  arena.innerHTML = names.map((n) => `<span class="chip">${h(n)}</span>`).join('');
   return [...arena.children].map((el) => ({ el, w: el.offsetWidth, h: el.offsetHeight }));
 }
-function scatter(chips, dur, wild) {
+function scatter(chips) {
   chips.forEach((c) => {
-    const x = rand(30, 1890 - c.w);
-    const y = rand(150, 1050 - c.h);
-    const r = wild ? rand(-16, 16) : 0;
-    const s = wild ? rand(0.85, 1.3) : 1;
-    c.el.style.transition = dur ? `transform ${dur}ms cubic-bezier(.3,.7,.2,1)` : 'none';
-    c.el.style.transform = `translate(${x}px, ${y}px) rotate(${r}deg) scale(${s})`;
+    c.el.style.transform = `translate(${rand(30, 1890 - c.w)}px, ${rand(150, 1050 - c.h)}px)`;
   });
 }
 function idleArena(names) {
@@ -945,7 +932,7 @@ function idleArena(names) {
   const pick = [...names].sort(() => Math.random() - 0.5).slice(0, 40);
   const chips = chipEls(pick);
   chips.forEach((c) => { c.el.style.animationDelay = `${-rand(0, 6)}s`; });
-  scatter(chips, 0, false);
+  scatter(chips);
 }
 function fitName(el, name, base, width) {
   el.style.fontSize = `${Math.min(base, Math.floor(width / Math.max(1, name.length) / 0.95))}px`;
@@ -982,7 +969,7 @@ async function startDraw() {
     refresh();
     return;
   }
-  await shuffle(res.pool || [], res.winner.nickname, res.pool_size);
+  await lotto(res.pool || [], res.winner.nickname, res.pool_size);
   showWinner(res.winner);
   drawing = false;
   refresh();
@@ -990,66 +977,243 @@ async function startDraw() {
   setTimeout(() => rpc('quiz_admin_touch', { p_pin: pin }).catch(() => {}), 900);
 }
 
-function shuffle(pool, winner, poolSize) {
+// 로또 추첨기: 아이디가 적힌 공들이 유리 드럼 안에서 바람에 날려 섞이다가,
+// 당첨 공이 금색으로 바뀌어 위로 올라온 뒤 앞으로 크게 튀어나온다 (모두 5초)
+const BALL_COLORS = [
+  { base: '#1d57e6', light: '#8fb0ff', edge: '#0f3494', text: '#fff' },
+  { base: '#ffffff', light: '#ffffff', edge: '#c3d1f2', text: '#0b1f5b' },
+  { base: '#0b1f5b', light: '#4f69bd', edge: '#040c2b', text: '#fff' },
+  { base: '#5b8cff', light: '#c2d4ff', edge: '#2c5bd0', text: '#fff' },
+];
+const GOLD_BALL = { base: '#ffcf3f', light: '#fff3c4', edge: '#d39b00', text: '#0b1f5b' };
+const CANVAS_FONT = "'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', sans-serif";
+
+function ballSprite(name, col, r, k) {
+  const c = document.createElement('canvas');
+  c.width = c.height = Math.ceil(r * 2 * k);
+  const g = c.getContext('2d');
+  g.scale(k, k);
+  const grad = g.createRadialGradient(r * 0.7, r * 0.6, r * 0.05, r, r, r);
+  grad.addColorStop(0, col.light);
+  grad.addColorStop(0.5, col.base);
+  grad.addColorStop(1, col.edge);
+  g.fillStyle = grad;
+  g.beginPath();
+  g.arc(r, r, r, 0, Math.PI * 2);
+  g.fill();
+  // 이름은 공 너비에 맞춰 줄이고, 그래도 길면 말줄임
+  const maxW = r * 1.7;
+  let size = r * 0.6;
+  let text = name;
+  g.font = `800 ${size}px ${CANVAS_FONT}`;
+  const w = g.measureText(text).width;
+  if (w > maxW) {
+    size = Math.max(r * 0.32, (size * maxW) / w);
+    g.font = `800 ${size}px ${CANVAS_FONT}`;
+  }
+  while (g.measureText(text).width > maxW && text.length > 2) text = `${text.slice(0, -2)}…`;
+  g.fillStyle = col.text;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, r, r + size * 0.05);
+  g.fillStyle = 'rgba(255, 255, 255, 0.35)';
+  g.beginPath();
+  g.ellipse(r * 0.62, r * 0.4, r * 0.36, r * 0.18, -0.6, 0, Math.PI * 2);
+  g.fill();
+  return c;
+}
+
+function lotto(pool, winner, poolSize) {
   const root = stageEl.querySelector('.draw');
-  const arena = root.querySelector('[data-arena]');
-  const slot = root.querySelector('[data-slot]');
-  const nameEl = root.querySelector('[data-slot-name]');
-  const timer = root.querySelector('[data-timer]');
-  root.querySelector('[data-slot-wrap]').classList.remove('show-roster');
-  root.querySelector('[data-actions]')?.setAttribute('hidden', '');
-  root.querySelector('[data-pool-n]').textContent = poolSize;
-  root.querySelector('[data-slot-hint]').textContent = '두구두구… 아이디를 섞는 중';
+  const cv = root.querySelector('[data-lotto]');
+  const k = Math.min(2, Math.max(1, (devicePixelRatio || 1) * (stageEl.getBoundingClientRect().width / 1920)));
+  cv.width = 1920 * k;
+  cv.height = 1080 * k;
+  const ctx = cv.getContext('2d');
+  cv.hidden = false;
+  root.classList.add('lotto-on');
 
-  const names = pool.includes(winner) ? pool : [...pool, winner];
-  const onStage = [winner, ...names.filter((n) => n !== winner).sort(() => Math.random() - 0.5).slice(0, 55)];
-  arena.className = 'arena mixing';
-  const chips = chipEls(onStage.sort(() => Math.random() - 0.5));
-  scatter(chips, 0, true);
-  // 마지막에 아이디들이 빨려 들어갈 추첨 상자 중심 (무대 좌표)
-  const sr = slot.getBoundingClientRect();
-  const st = stageEl.getBoundingClientRect();
-  const k = st.width / 1920;
-  const cx = (sr.left + sr.width / 2 - st.left) / k;
-  const cy = (sr.top + sr.height / 2 - st.top) / k;
+  const CX = 960, CY = 548, R = 360, WALL = 10;
+  const TOP = CY - R + WALL + 4;
+  const names = [winner, ...pool.filter((n) => n !== winner).slice(0, 23)].sort(() => Math.random() - 0.5);
+  const r = Math.max(40, Math.min(76, R * Math.sqrt(0.4 / names.length)));
+  const balls = names.map((name, i) => ({
+    name, r, x: CX, y: CY, vx: rand(-200, 200), vy: rand(-100, 300), a: rand(0, Math.PI * 2),
+    img: ballSprite(name, BALL_COLORS[i % BALL_COLORS.length], r, k),
+  }));
+  // 겹치지 않게 드럼 안에 흩어 놓는다
+  balls.forEach((b, i) => {
+    for (let t = 0; t < 300; t++) {
+      const ang = rand(0, Math.PI * 2);
+      const d = Math.sqrt(Math.random()) * (R - WALL - r - 2);
+      b.x = CX + Math.cos(ang) * d;
+      b.y = CY + Math.sin(ang) * d;
+      if (balls.slice(0, i).every((o) => Math.hypot(o.x - b.x, o.y - b.y) > r * 2)) break;
+    }
+  });
+  const win = balls.find((b) => b.name === winner);
+  const BIG = 250;
+  const bigImg = ballSprite(winner, GOLD_BALL, BIG, k);
 
-  nameEl.classList.remove('ready');
-  slot.classList.add('spinning');
-  const T = 5000;
-  const LOCK = 0.88;
+  const T = 5000, PICK = 3900, OUT = 4350;
+  let picked = false;
+  const live = (b) => !(picked && b === win);
+
+  const step = (dt, blow) => {
+    for (const b of balls) {
+      if (!live(b)) continue;
+      let ax = 0, ay = 2000;
+      if (blow > 0) {
+        const dx = b.x - CX, dy = b.y - CY, d = Math.hypot(dx, dy) || 1;
+        if (dy > -R * 0.2) ay -= blow * rand(1400, 4600); // 아래에서 바람이 불어 올린다
+        ax += blow * rand(-2600, 2600);
+        ay += blow * rand(-1400, 1400);
+        ax += (blow * -dy / d) * 900; // 소용돌이
+        ay += (blow * dx / d) * 900;
+      }
+      b.vx = (b.vx + ax * dt) * 0.996;
+      b.vy = (b.vy + ay * dt) * 0.996;
+      const sp = Math.hypot(b.vx, b.vy);
+      if (sp > 1900) { b.vx *= 1900 / sp; b.vy *= 1900 / sp; }
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.a += (b.vx / b.r) * dt * 0.6;
+    }
+    for (let i = 0; i < balls.length; i++) {
+      for (let j = i + 1; j < balls.length; j++) {
+        const p = balls[i], q = balls[j];
+        if (!live(p) || !live(q)) continue;
+        const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy), min = p.r + q.r;
+        if (d >= min || d === 0) continue;
+        const nx = dx / d, ny = dy / d, over = (min - d) / 2;
+        p.x -= nx * over; p.y -= ny * over;
+        q.x += nx * over; q.y += ny * over;
+        const rel = (q.vx - p.vx) * nx + (q.vy - p.vy) * ny;
+        if (rel < 0) {
+          const imp = (-1.9 * rel) / 2;
+          p.vx -= imp * nx; p.vy -= imp * ny;
+          q.vx += imp * nx; q.vy += imp * ny;
+        }
+      }
+    }
+    for (const b of balls) {
+      if (!live(b)) continue;
+      const dx = b.x - CX, dy = b.y - CY, d = Math.hypot(dx, dy) || 1, lim = R - WALL - b.r;
+      if (d <= lim) continue;
+      const nx = dx / d, ny = dy / d;
+      b.x = CX + nx * lim;
+      b.y = CY + ny * lim;
+      const vn = b.vx * nx + b.vy * ny;
+      if (vn > 0) { b.vx -= 1.8 * vn * nx; b.vy -= 1.8 * vn * ny; }
+    }
+  };
+
+  const drawBall = (img, x, y, rad, a) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(a);
+    ctx.drawImage(img, -rad, -rad, rad * 2, rad * 2);
+    ctx.restore();
+  };
+
+  const draw = (t, p, dim, rr) => {
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.clearRect(0, 0, 1920, 1080);
+    ctx.globalAlpha = dim;
+    // 받침대
+    ctx.fillStyle = '#0b1f5b';
+    ctx.beginPath();
+    ctx.moveTo(CX - 150, CY + R - 30);
+    ctx.lineTo(CX + 150, CY + R - 30);
+    ctx.lineTo(CX + 230, CY + R + 80);
+    ctx.lineTo(CX - 230, CY + R + 80);
+    ctx.closePath();
+    ctx.fill();
+    // 유리 드럼과 바람 구멍
+    const glass = ctx.createRadialGradient(CX - R * 0.3, CY - R * 0.35, R * 0.1, CX, CY, R);
+    glass.addColorStop(0, 'rgba(255, 255, 255, 0.98)');
+    glass.addColorStop(1, 'rgba(219, 230, 255, 0.98)');
+    ctx.fillStyle = glass;
+    ctx.beginPath();
+    ctx.arc(CX, CY, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#c3d1f2';
+    ctx.beginPath();
+    ctx.arc(CX, CY + R - WALL, 46, Math.PI, 0);
+    ctx.fill();
+    for (const b of balls) if (live(b)) drawBall(b.img, b.x, b.y, b.r, b.a);
+    ctx.strokeStyle = '#b9cdfb';
+    ctx.lineWidth = WALL * 2;
+    ctx.beginPath();
+    ctx.arc(CX, CY, R, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.lineWidth = 16;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(CX, CY, R - 44, Math.PI * 1.12, Math.PI * 1.38);
+    ctx.stroke();
+    // 남은 시간
+    ctx.strokeStyle = '#1d57e6';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(CX, CY, R + 24, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#44516f';
+    ctx.font = `700 34px ${CANVAS_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(picked ? '당첨 공이 나왔어요!' : `추첨 대상 ${poolSize}명 · 두구두구…`, CX, CY + R + 125);
+    ctx.globalAlpha = 1;
+    if (!picked) return;
+    // 뽑힌 공
+    if (t < OUT) {
+      drawBall(win.img, win.x, win.y, r, win.a);
+      return;
+    }
+    const glow = ctx.createRadialGradient(win.x, win.y, rr * 0.8, win.x, win.y, rr * 1.7);
+    glow.addColorStop(0, 'rgba(255, 207, 63, 0.55)');
+    glow.addColorStop(1, 'rgba(255, 207, 63, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(win.x, win.y, rr * 1.7, 0, Math.PI * 2);
+    ctx.fill();
+    drawBall(bigImg, win.x, win.y, rr, 0);
+  };
+
+  const easeInOut = (x) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
+  const easeOutBack = (x) => 1 + 2.7 * (x - 1) ** 3 + 1.7 * (x - 1) ** 2;
+
   return new Promise((resolve) => {
     const t0 = performance.now();
-    let nextMix = 0, nextName = 0, locked = false, last = '';
+    let last = t0, from = null, a0 = 0;
     const frame = (now) => {
       const t = now - t0;
       const p = Math.min(1, t / T);
-      timer.style.width = `${p * 100}%`;
-      if (!locked) {
-        if (t >= nextMix) {
-          const gap = 140 + 560 * p * p;
-          scatter(chips, gap * 0.95, true);
-          nextMix = t + gap;
-        }
-        if (t >= nextName) {
-          let n;
-          do { n = names[Math.floor(Math.random() * names.length)]; } while (names.length > 1 && n === last);
-          last = n;
-          nameEl.textContent = n;
-          fitName(nameEl, n, 150, 960);
-          nextName = t + 45 + 380 * p * p * p;
-        }
-        if (p >= LOCK) {
-          locked = true;
-          nameEl.textContent = winner;
-          fitName(nameEl, winner, 150, 960);
-          slot.classList.remove('spinning');
-          slot.classList.add('locked');
-          arena.className = 'arena mixing settle';
-          chips.forEach((c) => {
-            c.el.style.transform = `translate(${cx - c.w / 2}px, ${cy - c.h / 2}px) scale(0.3)`;
-          });
-        }
+      const dt = Math.min(1 / 30, (now - last) / 1000);
+      last = now;
+      const blow = t < 250 ? 0 : t < PICK ? Math.min(1, (t - 250) / 500) : Math.max(0, 1 - (t - PICK) / 500);
+      if (!picked && t >= PICK) {
+        picked = true;
+        from = { x: win.x, y: win.y };
+        a0 = Math.atan2(Math.sin(win.a), Math.cos(win.a));
+        win.img = ballSprite(winner, GOLD_BALL, r, k);
       }
+      for (let i = 0; i < 3; i++) step(dt / 3, blow);
+      let rr = r;
+      if (picked && t < OUT) {
+        const e = easeInOut((t - PICK) / (OUT - PICK));
+        win.x = from.x + (CX - from.x) * e;
+        win.y = from.y + (TOP + r - from.y) * e;
+        win.a = a0 * (1 - e);
+      } else if (picked) {
+        const e = easeOutBack(Math.min(1, (t - OUT) / (T - OUT - 100)));
+        win.x = CX;
+        win.y = TOP + r + (540 - TOP - r) * e;
+        rr = r + (BIG - r) * e;
+      }
+      const dim = t < OUT ? 1 : 1 - 0.7 * Math.min(1, (t - OUT) / 400);
+      draw(t, p, dim, rr);
       if (p < 1) requestAnimationFrame(frame);
       else resolve();
     };
@@ -1074,11 +1238,10 @@ function closeOverlay() {
   overlayOpen = false;
   if (!root) return;
   root.querySelector('[data-overlay]').hidden = true;
-  const slot = root.querySelector('[data-slot]');
-  slot.classList.remove('locked', 'spinning');
+  root.querySelector('[data-lotto]').hidden = true;
+  root.classList.remove('lotto-on');
   // 추첨 상자 글자는 update()가 상황에 맞게 다시 채운다
   root.querySelector('[data-slot-name]').dataset.v = '';
-  root.querySelector('[data-timer]').style.width = '0';
   arenaSig = '';
   render();
 }
