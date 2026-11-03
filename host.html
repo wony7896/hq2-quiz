@@ -37,6 +37,7 @@
   .chip.new { animation: pop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both; border-color: var(--b-blue); }
   @keyframes pop { from { transform: scale(0.3); opacity: 0; } }
   .chip.more { background: var(--b-sky); border-color: transparent; color: var(--b-blue-700); }
+  .chip[hidden] { display: none; }
 
   .qr svg { display: block; width: 100%; height: 100%; }
 
@@ -129,7 +130,6 @@
   .voters .chip { height: 48px; padding: 0 20px; font-size: 24px; }
   .voters .chip.ok { background: var(--b-blue); border-color: var(--b-blue); color: #fff; }
   .voters .chip.no { opacity: 0.4; }
-  .voters .chip[hidden] { display: none; }
   .key-hint { margin-left: auto; font-size: 26px; font-weight: 600; color: var(--muted); }
   .key-hint kbd { font: inherit; font-weight: 800; color: var(--ink-2); background: #fff; border: 2px solid var(--line); border-radius: 10px; padding: 2px 12px; margin-right: 8px; }
 
@@ -190,6 +190,16 @@
   @keyframes shake { 25% { transform: translate(-3px, 1px) rotate(-0.3deg); } 75% { transform: translate(3px, -1px) rotate(0.3deg); } }
   .slot.locked { border-color: var(--gold); box-shadow: 0 0 0 12px rgba(255, 207, 63, 0.35), 0 30px 80px rgba(11, 31, 91, 0.2); transform: scale(1.04); }
   .slot.locked .slot-name { color: var(--b-navy); }
+  .draw.qd .draw-body { grid-template-columns: 1fr; }
+  .slot-wrap { min-height: 0; }
+  .slot-wrap.show-roster .slot, .slot-wrap:not(.show-roster) .roster-box { display: none; }
+  .roster-box { display: flex; flex-direction: column; align-items: center; gap: 40px; width: 100%; }
+  .roster { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 18px; max-width: 1640px; max-height: 620px; overflow: hidden; }
+  .roster .chip { height: auto; padding: 0.3em 0.85em; font-size: var(--fs, 40px); border-width: 3px; border-color: var(--b-blue); box-shadow: var(--shadow); animation: pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+  .roster .chip:nth-child(3n) { background: var(--b-blue); color: #fff; }
+  .roster .chip.more { border-color: transparent; box-shadow: none; background: var(--b-sky); color: var(--b-blue-700); }
+  .slot-actions { display: flex; justify-content: center; gap: 14px; }
+  .slot-actions[hidden] { display: none; }
   .slot .again { margin-top: 20px; border: 0; background: var(--b-sky); color: var(--b-blue-700); font-size: 26px; font-weight: 800; padding: 12px 30px; border-radius: 999px; }
   .slot .again:hover { background: var(--b-sky-2); }
 
@@ -653,7 +663,7 @@ const VIEWS = {
     html: (st) => {
       const qd = st.stage === 'qdraw';
       return `
-      <section class="slide draw">
+      <section class="slide draw${qd ? ' qd' : ''}">
         <div class="arena idle" data-arena></div>
         <header class="draw-head">
           <h2 class="title">${qd ? `Q${st.qno} 정답자 추첨` : '경품 추첨'}</h2>
@@ -666,16 +676,23 @@ const VIEWS = {
           </div>
         </header>
         <div class="draw-body">
-          <div class="slot-wrap">
+          <div class="slot-wrap" data-slot-wrap>
+            ${qd ? `<div class="roster-box">
+              <div class="roster" data-roster></div>
+              <div class="slot-hint" data-roster-hint></div>
+            </div>` : ''}
             <div class="slot" data-slot>
               <div class="slot-label">추첨 대상 <b data-pool-n>0</b>명</div>
               <div class="slot-name ready" data-slot-name>READY</div>
               <div class="slot-hint" data-slot-hint></div>
-              ${qd ? '<button class="again" data-again hidden>한 명 더 추첨</button>' : ''}
+              ${qd ? `<div class="slot-actions" data-actions hidden>
+                <button class="again" data-again>한 명 더 추첨</button>
+                <button class="again" data-cancel>당첨 취소</button>
+              </div>` : ''}
               <div class="slot-timer"><i data-timer></i></div>
             </div>
           </div>
-          <aside class="winners"><h3>당첨자 <small data-win-n></small></h3><ol data-win-list></ol></aside>
+          ${qd ? '' : '<aside class="winners"><h3>당첨자 <small data-win-n></small></h3><ol data-win-list></ol></aside>'}
         </div>
         <div class="win-overlay" data-overlay hidden>
           <canvas width="1920" height="1080" data-confetti></canvas>
@@ -694,6 +711,15 @@ const VIEWS = {
         e.currentTarget.blur();
         if (!drawing && !overlayOpen) startDraw();
       });
+      // 당첨자가 자리에 없을 때: 취소하면 다시 정답자 목록으로 돌아가 새로 뽑을 수 있다
+      root.querySelector('[data-cancel]')?.addEventListener('click', (e) => {
+        e.currentTarget.blur();
+        const st = steps[stepIdx];
+        const w = qWinners(st).at(-1);
+        if (!w || drawing || overlayOpen) return;
+        if (!confirm(`'${w.nickname}' 당첨을 취소할까요?\n취소하면 다시 추첨할 수 있어요.`)) return;
+        removeWinner(w.id);
+      });
       root.querySelectorAll('[data-mode]').forEach((el) => el.addEventListener('click', (e) => {
         if (drawing) return;
         const step = e.target.closest('[data-k]');
@@ -705,14 +731,11 @@ const VIEWS = {
         e.currentTarget.blur?.();
         render();
       }));
-      root.querySelector('[data-win-list]').addEventListener('click', async (e) => {
+      root.querySelector('[data-win-list]')?.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-remove]');
         if (!btn || drawing) return;
         if (!confirm(`'${btn.dataset.name}' 당첨을 취소할까요?\n취소하면 다시 추첨 후보가 됩니다.`)) return;
-        try {
-          await rpc('quiz_admin_remove_winner', { p_pin: pin, p_winner_id: Number(btn.dataset.remove) });
-          refresh();
-        } catch (err) { toast(err.message); }
+        removeWinner(Number(btn.dataset.remove));
       });
     },
     update(st) {
@@ -733,11 +756,14 @@ const VIEWS = {
       }
       root.querySelector('[data-pool-n]').textContent = pool.length;
 
+      // 오른쪽 당첨자 목록은 마지막 경품 추첨에만 있다 (문제별 당첨자도 Q번호와 함께 보여 준다)
       const ws = status.winners;
-      root.querySelector('[data-win-n]').textContent = ws.length ? `${ws.length}명` : '';
-      root.querySelector('[data-win-list]').innerHTML = ws.length
-        ? ws.map((w) => `<li><i${w.qno ? ' class="q"' : ''}>${w.qno ? `Q${w.qno}` : w.rank}</i><span>${h(w.nickname)}</span><button data-remove="${w.id}" data-name="${h(w.nickname)}" title="당첨 취소">취소</button></li>`).join('')
-        : '<li class="empty">아직 당첨자가 없어요.<br>추첨을 시작해 보세요!</li>';
+      if (!qd) {
+        root.querySelector('[data-win-n]').textContent = ws.length ? `${ws.length}명` : '';
+        root.querySelector('[data-win-list]').innerHTML = ws.length
+          ? ws.map((w) => `<li><i${w.qno ? ' class="q"' : ''}>${w.qno ? `Q${w.qno}` : w.rank}</i><span>${h(w.nickname)}</span><button data-remove="${w.id}" data-name="${h(w.nickname)}" title="당첨 취소">취소</button></li>`).join('')
+          : '<li class="empty">아직 당첨자가 없어요.<br>추첨을 시작해 보세요!</li>';
+      }
 
       if (overlayOpen) return;
       // 추첨 상자: 대기 / 이 문제 당첨자 / 정답자 없음
@@ -762,13 +788,28 @@ const VIEWS = {
       }
       const hintEl = root.querySelector('[data-slot-hint]');
       if (hintEl.innerHTML !== hint) hintEl.innerHTML = hint;
-      const again = root.querySelector('[data-again]');
-      if (again) again.hidden = !(mine.length && pool.length);
+      const actions = root.querySelector('[data-actions]');
+      if (actions) {
+        actions.hidden = !mine.length;
+        root.querySelector('[data-again]').hidden = !pool.length;
+      }
 
-      const sig = pool.map((p) => p.id).join();
+      // 문제 정답자 추첨: 뽑기 전에는 정답자 아이디를 화면 가운데에 크게 보여 준다
+      const showRoster = qd && !mine.length && pool.length > 0;
+      root.querySelector('[data-slot-wrap]').classList.toggle('show-roster', showRoster);
+      if (showRoster) {
+        const cur = currentOf(st);
+        const skipped = cur ? cur.answers.filter((a) => a.choice === cur.answer).length - pool.length : 0;
+        renderRoster(root.querySelector('[data-roster]'), pool);
+        const rh = `<kbd>Space</kbd> 또는 <kbd>→</kbd> 를 누르면 정답자 중 한 명을 추첨합니다${skipped > 0 ? ` · 이미 당첨된 ${skipped}명 제외` : ''}`;
+        const rhEl = root.querySelector('[data-roster-hint]');
+        if (rhEl.innerHTML !== rh) rhEl.innerHTML = rh;
+      }
+
+      const sig = `${showRoster ? 'r' : 'a'}|${pool.map((p) => p.id).join()}`;
       if (sig !== arenaSig) {
         arenaSig = sig;
-        idleArena(pool.map((p) => p.nickname));
+        idleArena(showRoster ? [] : pool.map((p) => p.nickname));
       }
     },
   },
@@ -824,10 +865,25 @@ function renderVoters(el, answers, answer) {
   el.innerHTML = shown.map((a) => `<span class="chip${cls(a)}">${h(a.nickname)}</span>`).join('')
     + '<span class="chip more" hidden></span>';
   answers.forEach((a) => voterSeen.add(a.id));
-  // 두 줄에 다 안 들어가면 뒤쪽 아이디를 '외 N명'으로 묶는다
+  fitChips(el, list.length - shown.length);
+}
+
+// 정답자 추첨 전 화면의 정답자 아이디 (사람 수에 따라 글자 크기를 맞춘다)
+function renderRoster(el, pool) {
+  const sig = pool.map((p) => p.id).join();
+  if (el.dataset.sig === sig) return;
+  el.dataset.sig = sig;
+  const n = pool.length;
+  el.style.setProperty('--fs', `${n <= 8 ? 64 : n <= 20 ? 48 : n <= 50 ? 36 : 28}px`);
+  const shown = pool.slice(0, 200);
+  el.innerHTML = shown.map((p) => `<span class="chip">${h(p.nickname)}</span>`).join('') + '<span class="chip more" hidden></span>';
+  fitChips(el, n - shown.length);
+}
+
+// 칸에 다 안 들어가면 뒤쪽 아이디를 '외 N명'으로 묶는다 (마지막 칸이 '외 N명' 자리)
+function fitChips(el, rest) {
   const more = el.lastElementChild;
   const chips = [...el.children].slice(0, -1);
-  let rest = list.length - shown.length;
   const setMore = () => { more.hidden = rest === 0; more.textContent = `외 ${rest}명`; };
   setMore();
   while (chips.length && el.scrollHeight > el.clientHeight + 1) {
@@ -894,6 +950,13 @@ function fitName(el, name, base, width) {
   el.style.fontSize = `${Math.min(base, Math.floor(width / Math.max(1, name.length) / 0.95))}px`;
 }
 
+async function removeWinner(id) {
+  try {
+    await rpc('quiz_admin_remove_winner', { p_pin: pin, p_winner_id: id });
+    refresh();
+  } catch (err) { toast(err.message); }
+}
+
 async function startDraw() {
   const st = steps[stepIdx];
   const qd = st.stage === 'qdraw';
@@ -932,6 +995,8 @@ function shuffle(pool, winner, poolSize) {
   const slot = root.querySelector('[data-slot]');
   const nameEl = root.querySelector('[data-slot-name]');
   const timer = root.querySelector('[data-timer]');
+  root.querySelector('[data-slot-wrap]').classList.remove('show-roster');
+  root.querySelector('[data-actions]')?.setAttribute('hidden', '');
   root.querySelector('[data-pool-n]').textContent = poolSize;
   root.querySelector('[data-slot-hint]').textContent = '두구두구… 아이디를 섞는 중';
 
