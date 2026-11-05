@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d57e6">
+<meta name="robots" content="noindex">
+<title>본사2지부 사전 질문</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="assets/base.css">
+<style>
+  body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+  .top {
+    background: linear-gradient(150deg, var(--b-blue), var(--b-navy));
+    color: #fff;
+    padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
+  }
+  .top b { display: block; width: 100%; max-width: 520px; margin: 0 auto; font-size: 16px; font-weight: 800; }
+  main { flex: 1; width: 100%; max-width: 520px; margin: 0 auto; padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 16px; }
+  .view { display: flex; flex-direction: column; gap: 16px; animation: up 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  @keyframes up { from { opacity: 0; transform: translateY(12px); } }
+  .hero { padding: 18px 4px 4px; }
+  .eyebrow { font-size: 13px; font-weight: 800; color: var(--b-blue); letter-spacing: 0.02em; }
+  .hero h1 { font-size: 28px; line-height: 1.25; font-weight: 900; letter-spacing: -0.03em; margin: 8px 0 8px; color: var(--b-navy); }
+  .hero p { margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600; color: var(--ink-2); }
+  .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 20px; }
+  .center { text-align: center; }
+  label.lbl { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 800; margin-bottom: 8px; }
+  label.lbl span { font-weight: 600; color: var(--muted); font-size: 13px; }
+  textarea.field { resize: vertical; min-height: 150px; font-size: 16px; line-height: 1.55; display: block; }
+  input.field { font-size: 16px; display: block; }
+  .gap { height: 18px; }
+  .card .hint { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 8px 0 18px; }
+  .card .err { color: var(--danger); font-size: 14px; font-weight: 600; margin: -6px 0 14px; }
+  .card .err:empty { display: none; }
+  .btn.block { width: 100%; padding: 16px; font-size: 17px; border-radius: 16px; }
+  .badge-ok { width: 64px; height: 64px; margin: 4px auto 12px; border-radius: 50%; background: var(--b-sky); color: var(--b-blue); display: grid; place-items: center; }
+  .badge-ok svg { width: 34px; height: 34px; }
+  .card h2 { margin: 0 0 8px; font-size: 22px; font-weight: 900; letter-spacing: -0.02em; }
+  .card p { margin: 0; color: var(--ink-2); line-height: 1.55; font-size: 15px; }
+  .card p + .btn { margin-top: 20px; }
+</style>
+</head>
+<body>
+<header class="top"><b>SK브로드밴드노동조합 본사2지부</b></header>
+<main id="app"></main>
+
+<script type="module">
+import { rpc } from './assets/api.js';
+
+const app = document.getElementById('app');
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+
+function showForm() {
+  app.innerHTML = `
+    <div class="view">
+      <div class="hero">
+        <div class="eyebrow">문화행사 사전 질문</div>
+        <h1>노동조합에 묻고 싶은 것을 남겨 주세요</h1>
+        <p>보내 주신 질문은 행사에서 노조위원장이 직접 답변해요.</p>
+      </div>
+      <form class="card" id="askForm">
+        <label class="lbl" for="body">질문 <span id="count">0 / 500</span></label>
+        <textarea class="field" id="body" maxlength="500" placeholder="궁금한 점을 자유롭게 적어 주세요" required></textarea>
+        <div class="gap"></div>
+        <label class="lbl" for="author">이름 <span>선택</span></label>
+        <input class="field" id="author" maxlength="30" autocomplete="off" placeholder="비워 두면 익명으로 접수돼요">
+        <p class="hint">이름을 비워 두면 관리자 화면에도 익명으로 표시돼요. 비슷한 질문은 묶어서 답변할 수 있어요.</p>
+        <p class="err" id="err"></p>
+        <button class="btn block" type="submit">질문 보내기</button>
+      </form>
+    </div>`;
+  const body = document.getElementById('body');
+  const count = document.getElementById('count');
+  body.addEventListener('input', () => { count.textContent = `${body.value.length} / 500`; });
+  document.getElementById('askForm').addEventListener('submit', submit);
+}
+
+function showDone() {
+  app.innerHTML = `
+    <div class="view">
+      <div class="card center">
+        <div class="badge-ok">${CHECK}</div>
+        <h2>질문이 접수됐어요</h2>
+        <p>보내 주셔서 고맙습니다. 행사에서 노조위원장이 답변해 드려요.</p>
+        <button class="btn ghost block" type="button" id="again">질문 하나 더 보내기</button>
+      </div>
+    </div>`;
+  document.getElementById('again').onclick = showForm;
+  scrollTo(0, 0);
+}
+
+function showClosed() {
+  app.innerHTML = `
+    <div class="view">
+      <div class="card center">
+        <h2>질문 접수가 마감됐어요</h2>
+        <p>참여해 주셔서 고맙습니다. 행사에서 만나요.</p>
+      </div>
+    </div>`;
+}
+
+let sending = false;
+async function submit(e) {
+  e.preventDefault();
+  if (sending) return;
+  const err = document.getElementById('err');
+  const btn = e.target.querySelector('button[type=submit]');
+  err.textContent = '';
+  sending = true;
+  btn.disabled = true;
+  try {
+    await rpc('quiz_ask_submit', {
+      p_body: document.getElementById('body').value,
+      p_author: document.getElementById('author').value,
+    });
+    showDone();
+  } catch (ex) {
+    if (ex.code === 'ask_closed') showClosed();
+    else {
+      // 쓴 글은 그대로 두고 다시 보낼 수 있게 한다
+      err.textContent = ex.message;
+      btn.disabled = false;
+    }
+  } finally {
+    sending = false;
+  }
+}
+
+// 상태를 못 읽어도 양식은 보여 준다. 마감됐으면 보낼 때 다시 걸러진다.
+showForm();
+rpc('quiz_ask_info').then((r) => { if (r && r.open === false) showClosed(); }).catch(() => {});
+</script>
+</body>
+</html>

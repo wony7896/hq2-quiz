@@ -13,6 +13,10 @@ const ERRORS = {
   invalid_question: '문제 번호가 올바르지 않아요.',
   invalid_questions: '문제는 1~30개까지 저장할 수 있어요.',
   pin_too_short: '새 PIN은 6자 이상이어야 해요.',
+  ask_closed: '질문 접수가 마감됐어요.',
+  invalid_ask: '질문은 2자 이상 500자 이내로 적어 주세요.',
+  invalid_ask_name: '이름은 30자 이내로 적어 주세요.',
+  asks_full: '질문이 많이 접수되어 더 받을 수 없어요.',
 };
 
 export class ApiError extends Error {

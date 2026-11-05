@@ -293,6 +293,32 @@
   .plist button { border: 0; background: transparent; color: var(--muted); width: 22px; height: 22px; border-radius: 50%; font-size: 14px; line-height: 1; }
   .plist button:hover { background: #fff; color: var(--danger); }
   .linkbox { font-size: 14px; word-break: break-all; background: var(--page); border-radius: 10px; padding: 10px 12px; }
+  #askBadge { margin-left: 6px; background: var(--b-blue); color: #fff; border-radius: 999px; font-size: 12px; padding: 1px 7px; }
+  #askBadge[hidden] { display: none; }
+  .set-row .linkbox { flex: 1; min-width: 240px; }
+  .ask-state { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; background: #fff0f2; color: var(--danger); vertical-align: 1px; }
+  .ask-state.on { background: var(--b-sky); color: var(--b-blue-700); }
+  .ask-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+  .ask-filter button { border: 0; background: #fff; color: var(--ink-2); border-radius: 999px; padding: 8px 14px; font-size: 14px; font-weight: 700; box-shadow: var(--shadow); }
+  .ask-filter button.on { background: var(--b-blue); color: #fff; }
+  .ask { background: #fff; border-radius: 16px; padding: 16px; box-shadow: var(--shadow); margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .ask-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .ask-head b { color: var(--ink); font-size: 14px; }
+  .ask-head .ask-no { display: grid; place-items: center; min-width: 24px; height: 24px; border-radius: 8px; background: var(--b-blue); color: #fff; font-size: 13px; }
+  .ask-head em { margin-left: auto; font-style: normal; font-weight: 700; color: var(--b-blue-700); background: var(--b-sky); border-radius: 999px; padding: 2px 10px; }
+  .ask-body { margin: 0; font-size: 16px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ask textarea { resize: vertical; min-height: 64px; font-size: 14px; line-height: 1.5; }
+  .ask-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ask-actions button { border: 0; background: var(--b-sky); color: var(--b-blue-700); border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 700; }
+  .ask-actions button:disabled { opacity: 0.35; cursor: default; }
+  .ask-actions button.del { margin-left: auto; background: #fff0f2; color: var(--danger); }
+  .ask-empty { margin: 0; padding: 32px 16px; text-align: center; color: var(--muted); font-size: 15px; }
+  @media (max-width: 600px) {
+    #settings .tabs { flex: none; flex-wrap: wrap; padding-left: 12px; padding-right: 12px; }
+    #settings .body { padding-left: 14px; padding-right: 14px; }
+    #settings footer { flex-wrap: wrap; }
+    #settings footer .note { flex-basis: 100%; }
+  }
 </style>
 </head>
 <body class="host">
@@ -328,6 +354,7 @@
       <button data-tab="questions" class="on">문제</button>
       <button data-tab="event">행사 정보</button>
       <button data-tab="people">참여자·초기화</button>
+      <button data-tab="asks">조합원 질문<span id="askBadge" hidden></span></button>
       <button data-tab="security">PIN</button>
     </nav>
     <div class="body" id="settingsBody"></div>
@@ -350,6 +377,7 @@ const store = {
 const stageEl = document.getElementById('stage');
 const joinUrl = new URL('./', location.href).href;
 const joinUrlText = joinUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+const askUrl = new URL('./ask.html', location.href).href;
 
 let pin = store.get(PIN_KEY) || '';
 let status = null;
@@ -1372,6 +1400,9 @@ const setBody = document.getElementById('settingsBody');
 const setFoot = document.getElementById('settingsFoot');
 let tab = 'questions';
 let draft = [];
+let asks = [];
+let askOpen = true;
+let askFilter = 'new';
 
 async function openSettings() {
   try {
@@ -1381,18 +1412,78 @@ async function openSettings() {
       answer: q.answer,
       explanation: q.explanation,
     }));
+    await loadAsks();
   } catch (e) { toast(e.message); return; }
   setDlg.showModal();
   renderTab();
 }
 document.getElementById('closeSettings').onclick = () => setDlg.close();
-document.getElementById('tabs').addEventListener('click', (e) => {
+document.getElementById('tabs').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-tab]');
   if (!b) return;
   tab = b.dataset.tab;
   document.querySelectorAll('#tabs button').forEach((x) => x.classList.toggle('on', x === b));
+  if (tab === 'asks') {
+    try { await loadAsks(); } catch (err) { toast(err.message); }
+  }
   renderTab();
 });
+
+async function loadAsks() {
+  const r = await rpc('quiz_admin_asks', { p_pin: pin });
+  asks = r.items;
+  askOpen = r.open;
+  const fresh = asks.filter((a) => a.status === 'new').length;
+  const badge = document.getElementById('askBadge');
+  badge.textContent = fresh;
+  badge.hidden = !fresh;
+}
+
+// 답변 요청은 정한 순서대로, 나머지는 최근에 온 질문부터 보여 준다
+function asksOf(filter) {
+  if (filter === 'all') return asks;
+  const list = asks.filter((a) => a.status === filter);
+  if (filter !== 'pick') return list;
+  return list.sort((x, y) => (x.sort_order ?? Infinity) - (y.sort_order ?? Infinity) || new Date(x.created_at) - new Date(y.created_at));
+}
+
+function askTime(s) {
+  const d = new Date(s);
+  const two = (n) => String(n).padStart(2, '0');
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${two(d.getHours())}:${two(d.getMinutes())}`;
+}
+
+function askCard(a, i, total) {
+  const ordering = askFilter === 'pick';
+  const label = { new: '새 질문', pick: '답변 요청', hold: '보류' }[a.status];
+  return `
+    <article class="ask" data-id="${a.id}">
+      <div class="ask-head">
+        ${ordering ? `<b class="ask-no">${i + 1}</b>` : ''}
+        <b>${h(a.author || '익명')}</b>
+        <span>${askTime(a.created_at)}</span>
+        ${askFilter === 'all' ? `<em>${label}</em>` : ''}
+      </div>
+      <p class="ask-body">${h(a.body)}</p>
+      ${a.status === 'pick' || a.edited ? `<textarea class="field" data-ask-edit maxlength="500" placeholder="위원장에게 전달할 문구로 다듬기 (비워 두면 원문 그대로 전달)">${h(a.edited)}</textarea>` : ''}
+      <div class="ask-actions">
+        ${ordering ? `
+          <button type="button" data-act="ask-up" title="위로" ${i === 0 ? 'disabled' : ''}>▲</button>
+          <button type="button" data-act="ask-down" title="아래로" ${i === total - 1 ? 'disabled' : ''}>▼</button>` : ''}
+        ${a.status !== 'pick' ? '<button type="button" data-act="ask-pick">답변 요청</button>' : ''}
+        ${a.status !== 'hold' ? '<button type="button" data-act="ask-hold">보류</button>' : ''}
+        <button type="button" class="del" data-act="ask-del">삭제</button>
+      </div>
+    </article>`;
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    throw new Error('복사하지 못했어요. 직접 선택해서 복사해 주세요.');
+  }
+}
 
 function renderTab() {
   if (tab === 'questions') {
@@ -1449,13 +1540,36 @@ function renderTab() {
       </div>
       <div class="set-section">
         <h3>초기화</h3>
-        <p>문제는 그대로 두고 기록만 지워요.</p>
+        <p>문제와 조합원 질문은 그대로 두고 기록만 지워요.</p>
         <div class="set-row">
           <button class="btn ghost" type="button" data-act="reset-winners">당첨 기록만 초기화</button>
           <button class="btn danger" type="button" data-act="reset-all">전체 초기화 (참여자·답변·당첨)</button>
         </div>
       </div>`;
     setFoot.innerHTML = '';
+  } else if (tab === 'asks') {
+    const list = asksOf(askFilter);
+    const picks = asksOf('pick').length;
+    const filters = [['new', '새 질문'], ['pick', '답변 요청'], ['hold', '보류'], ['all', '전체']];
+    setBody.innerHTML = `
+      <div class="warn">질문 원문과 이름이 보이는 화면이에요. 스크린에 띄운 상태라면 화면 공유를 끄고 정리하세요.</div>
+      <div class="set-section">
+        <h3>조합원에게 보낼 링크<span class="ask-state ${askOpen ? 'on' : ''}">${askOpen ? '접수 중' : '접수 마감'}</span></h3>
+        <p>메일에 이 주소를 넣어 보내세요. 조합원은 로그인 없이 바로 질문을 남길 수 있어요.</p>
+        <div class="set-row">
+          <div class="linkbox"><a href="${h(askUrl)}" target="_blank" rel="noopener">${h(askUrl)}</a></div>
+          <button class="btn ghost" type="button" data-act="ask-link">링크 복사</button>
+          <button class="btn ghost" type="button" data-act="ask-toggle">${askOpen ? '접수 마감하기' : '접수 다시 열기'}</button>
+        </div>
+      </div>
+      <div class="ask-filter">
+        ${filters.map(([f, name]) => `<button type="button" data-act="ask-filter" data-f="${f}" class="${askFilter === f ? 'on' : ''}">${name} ${asksOf(f).length}</button>`).join('')}
+      </div>
+      ${list.map((a, i) => askCard(a, i, list.length)).join('') || `<p class="ask-empty">${asks.length ? '이 목록에는 질문이 없어요.' : '아직 접수된 질문이 없어요.'}</p>`}`;
+    setFoot.innerHTML = `
+      <span class="note">답변 요청 질문을 순서대로 복사해요. 이름은 빠져요.</span>
+      <button class="btn ghost" type="button" data-act="ask-reload">새로고침</button>
+      <button class="btn" type="button" data-act="ask-copy" ${picks ? '' : 'disabled'}>답변 요청 ${picks}개 복사</button>`;
   } else {
     setBody.innerHTML = `
       <div class="set-section">
@@ -1484,13 +1598,64 @@ setBody.addEventListener('input', (e) => {
   }
 });
 
+// 다듬은 문구는 입력칸을 벗어날 때 저장한다
+setBody.addEventListener('change', async (e) => {
+  if (!e.target.matches('[data-ask-edit]')) return;
+  const a = asks.find((x) => x.id === e.target.closest('.ask').dataset.id);
+  a.edited = e.target.value.trim();
+  try {
+    await rpc('quiz_admin_ask_update', { p_pin: pin, p_id: a.id, p_edited: a.edited });
+    toast('문구를 저장했어요.');
+  } catch (err) {
+    toast(err.message);
+  }
+});
+
 setDlg.addEventListener('click', async (e) => {
-  const act = e.target.closest('[data-act]')?.dataset.act;
+  const actEl = e.target.closest('[data-act]');
+  const act = actEl?.dataset.act;
   const del = e.target.closest('[data-del]');
   const card = e.target.closest('.qe');
   const i = card ? Number(card.dataset.i) : -1;
+  const askId = e.target.closest('.ask')?.dataset.id;
   try {
-    if (del) {
+    if (act === 'ask-filter') {
+      askFilter = actEl.dataset.f;
+      renderTab();
+    } else if (act === 'ask-link') {
+      await copyText(askUrl);
+      toast('링크를 복사했어요.');
+    } else if (act === 'ask-toggle') {
+      if (askOpen && !confirm('질문 접수를 마감할까요?\n링크를 열면 마감 안내가 보이고, 다시 열 수도 있어요.')) return;
+      await rpc('quiz_admin_ask_open', { p_pin: pin, p_open: !askOpen });
+      await loadAsks();
+      renderTab();
+    } else if (act === 'ask-reload') {
+      await loadAsks();
+      renderTab();
+      toast(`질문 ${asks.length}개를 불러왔어요.`);
+    } else if (act === 'ask-copy') {
+      const picks = asksOf('pick');
+      await copyText(`본사2지부 조합원 사전 질문 ${picks.length}개\n\n${picks.map((a, n) => `${n + 1}. ${a.edited || a.body}`).join('\n\n')}`);
+      toast(`질문 ${picks.length}개를 복사했어요.`);
+    } else if (act === 'ask-pick' || act === 'ask-hold') {
+      await rpc('quiz_admin_ask_update', { p_pin: pin, p_id: askId, p_status: act.slice(4) });
+      await loadAsks();
+      renderTab();
+    } else if (act === 'ask-up' || act === 'ask-down') {
+      const ids = asksOf('pick').map((a) => a.id);
+      const from = ids.indexOf(askId);
+      const to = from + (act === 'ask-up' ? -1 : 1);
+      [ids[from], ids[to]] = [ids[to], ids[from]];
+      await rpc('quiz_admin_ask_order', { p_pin: pin, p_ids: ids });
+      await loadAsks();
+      renderTab();
+    } else if (act === 'ask-del') {
+      if (!confirm('이 질문을 지울까요?\n되돌릴 수 없어요.')) return;
+      await rpc('quiz_admin_ask_delete', { p_pin: pin, p_id: askId });
+      await loadAsks();
+      renderTab();
+    } else if (del) {
       if (!confirm(`'${del.dataset.name}' 참여자를 지울까요?`)) return;
       await rpc('quiz_admin_delete_participant', { p_pin: pin, p_id: del.dataset.del });
       await refresh();
