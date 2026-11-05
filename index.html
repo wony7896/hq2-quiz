@@ -71,6 +71,13 @@
   .reveal .opt.right .tag { background: rgba(255, 255, 255, 0.2); color: #fff; }
   .reveal .opt.mine:not(.right) { opacity: 1; border-color: #c9d1e3; border-style: dashed; }
 
+  .timer { display: flex; align-items: center; gap: 12px; }
+  .timer-bar { flex: 1; height: 12px; border-radius: 6px; background: var(--b-sky-2); overflow: hidden; }
+  .timer-bar i { display: block; height: 100%; border-radius: 6px; background: var(--b-blue); }
+  .timer b { flex: none; min-width: 52px; text-align: right; font-size: 22px; font-weight: 900; color: var(--b-navy); font-variant-numeric: tabular-nums; }
+  .timer.urgent .timer-bar i { background: var(--danger); }
+  .timer.urgent b { color: var(--danger); }
+  .state.off { background: #fff0f2; color: var(--danger); }
   .state { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 16px; background: var(--b-sky); color: var(--b-blue-700); font-weight: 700; font-size: 15px; }
   .state .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--b-blue); animation: blink 1s infinite; flex: none; }
   @keyframes blink { 50% { opacity: 0.25; } }
@@ -141,7 +148,7 @@ async function load() {
   try {
     if (token) {
       const r = await rpc('quiz_me', { p_token: token });
-      if (r.ok) { me = r; }
+      if (r.ok) { me = r; syncTimer(); }
       else { token = null; me = null; store.set(TOKEN_KEY, null); }
     }
     if (!token) pub = await rpc('quiz_public_state');
@@ -153,6 +160,34 @@ async function load() {
     if (again) { again = false; load(); }
   }
 }
+
+// ───────── 제한시간 ─────────
+// 시계가 어긋나도 맞도록 서버의 남은 시간을 받아 이 화면에서 줄여 나간다
+let timerEnd = null;
+let timerNo = 0;
+function syncTimer() {
+  const q = me?.question;
+  const ms = q && me.state.stage === 'q' && !me.state.revealed ? q.remaining_ms : null;
+  if (ms == null) { timerEnd = null; timerNo = 0; return; }
+  const end = performance.now() + ms;
+  if (timerNo !== q.no || Math.abs(end - timerEnd) > 500) { timerEnd = end; timerNo = q.no; }
+}
+const timeLeft = () => (timerEnd == null ? null : Math.max(0, timerEnd - performance.now()));
+let wasOver = false;
+function paintTimer() {
+  const left = timeLeft();
+  const over = left === 0;
+  if (over !== wasOver) {
+    wasOver = over;
+    if (me) render();
+  }
+  const el = document.getElementById('timer');
+  if (!el || left == null) return;
+  el.querySelector('i').style.width = `${(left / me.question.limit_ms) * 100}%`;
+  el.querySelector('b').textContent = over ? '마감' : `${Math.ceil(left / 1000)}초`;
+  el.classList.toggle('urgent', left <= 5000);
+}
+setInterval(paintTimer, 100);
 
 // ───────── 화면 ─────────
 function render() {
@@ -180,7 +215,7 @@ function render() {
   if (s.stage === 'qna') return show('qna', qnaView);
   if ((s.stage === 'q' || s.stage === 'qdraw') && me.question) {
     const q = me.question;
-    const mode = s.stage === 'qdraw' ? 'draw' : s.revealed ? 'reveal' : q.my_choice != null ? 'locked' : 'open';
+    const mode = s.stage === 'qdraw' ? 'draw' : s.revealed ? 'reveal' : q.my_choice != null ? 'locked' : timeLeft() === 0 ? 'closed' : 'open';
     return show(`q${q.no}-${mode}`, questionView);
   }
   return show(`done-${s.stage}-${me.score}-${w ? 'w' : ''}`, doneView);
@@ -236,7 +271,8 @@ function questionView() {
   const ox = q.options.every((o) => o.length <= 2);
   const revealed = s.revealed;
   const locked = q.my_choice != null;
-  const sel = locked ? q.my_choice : picked && picked.qno === q.no ? picked.i : null;
+  const closed = !revealed && !locked && timeLeft() === 0;
+  const sel = locked ? q.my_choice : !closed && picked && picked.qno === q.no ? picked.i : null;
   const right = q.my_choice === q.answer;
   let tail;
   if (revealed) {
@@ -251,18 +287,21 @@ function questionView() {
       : `<p class="muted">곧 정답자 추첨이 시작돼요</p>`;
   } else if (locked) {
     tail = `<div class="state"><span class="dot"></span>제출 완료! 정답 공개를 기다려 주세요</div>`;
+  } else if (closed) {
+    tail = `<div class="state off">응답이 마감됐어요. 정답 공개를 기다려 주세요</div>`;
   } else {
     tail = `<button class="btn block" id="submitBtn" ${sel == null ? 'disabled' : ''}>제출하기</button>
             <p class="muted">제출하면 바꿀 수 없어요</p>`;
   }
   return `
     <div class="qhead"><span class="qbadge">Q${q.no}</span><span class="qof">/ ${s.total}</span><span class="qscore">정답 ${me.score}개</span></div>
+    ${timeLeft() != null && !revealed ? '<div class="timer" id="timer"><div class="timer-bar"><i></i></div><b></b></div>' : ''}
     <h2 class="qtext">${h(q.question)}</h2>
-    <div class="opts${ox ? ' ox' : ''}${revealed ? ' reveal' : locked ? ' locked' : ''}" id="opts">
+    <div class="opts${ox ? ' ox' : ''}${revealed ? ' reveal' : locked || closed ? ' locked' : ''}" id="opts">
       ${q.options.map((o, i) => {
         const cls = [sel === i ? 'sel' : '', revealed && i === q.answer ? 'right' : '', i === q.my_choice ? 'mine' : ''].join(' ');
         const tag = revealed && i === q.my_choice ? '<span class="tag">내 선택</span>' : '';
-        return `<button class="opt ${cls}" data-i="${i}" ${locked || revealed ? 'disabled' : ''}><span class="num">${i + 1}</span><span class="txt">${h(o)}</span>${tag}</button>`;
+        return `<button class="opt ${cls}" data-i="${i}" ${locked || revealed || closed ? 'disabled' : ''}><span class="num">${i + 1}</span><span class="txt">${h(o)}</span>${tag}</button>`;
       }).join('')}
     </div>
     ${tail}`;

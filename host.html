@@ -80,17 +80,26 @@
 
   /* ── 문제 ── */
   .question { padding: 60px 96px 56px; }
-  .q-head { display: flex; align-items: center; gap: 28px; height: 120px; }
-  .q-badge { display: flex; align-items: baseline; gap: 4px; background: var(--b-blue); color: #fff; border-radius: 26px; padding: 14px 30px; font-weight: 900; font-size: 40px; }
-  .q-badge span { font-size: 64px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .q-head { display: flex; align-items: center; gap: 28px; height: 184px; }
+  .q-badge { background: var(--b-blue); color: #fff; border-radius: 26px; padding: 12px 30px; font-weight: 900; font-size: 64px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
   .q-of { font-size: 40px; font-weight: 800; color: var(--muted); }
   .q-progress { flex: 1; display: flex; gap: 10px; margin: 0 24px; }
   .q-progress i { flex: 1; height: 12px; border-radius: 6px; background: var(--b-sky-2); }
   .q-progress i.done { background: var(--b-blue); }
   .q-progress i.now { background: var(--b-blue); opacity: 0.45; }
-  .mini-qr { display: flex; align-items: center; gap: 18px; background: #fff; border-radius: 22px; padding: 12px 22px 12px 12px; box-shadow: var(--shadow); }
-  .mini-qr .qr { width: 104px; height: 104px; }
-  .mini-qr span { font-size: 24px; font-weight: 700; line-height: 1.35; color: var(--ink-2); }
+  .mini-qr { flex: none; background: #fff; border-radius: 22px; padding: 10px; box-shadow: var(--shadow); }
+  .mini-qr .qr { width: 164px; height: 164px; }
+  .q-timer { position: relative; flex: none; width: 164px; height: 164px; display: grid; place-items: center; }
+  .q-timer[hidden], .revealed .q-timer { display: none; }
+  .q-timer svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .q-timer .track { fill: #fff; stroke: var(--b-sky-2); stroke-width: 9; }
+  .q-timer .arc { fill: none; stroke: var(--b-blue); stroke-width: 9; stroke-linecap: round; stroke-dasharray: 100 100; }
+  .q-timer b { position: relative; font-size: 80px; font-weight: 900; line-height: 1; letter-spacing: -0.03em; color: var(--b-navy); font-variant-numeric: tabular-nums; }
+  .q-timer.urgent .arc { stroke: var(--danger); }
+  .q-timer.urgent b { color: var(--danger); animation: timer-beat 1s ease-out infinite; }
+  @keyframes timer-beat { from { transform: scale(1.18); } 45%, to { transform: scale(1); } }
+  .q-timer.over .track { stroke: var(--danger); }
+  .q-timer.over b { font-size: 48px; color: var(--danger); letter-spacing: -0.02em; animation: none; }
   .q-text { margin: 40px 0 40px; font-weight: 800; line-height: 1.3; letter-spacing: -0.025em; color: var(--b-navy); font-size: 72px; }
   .q-text.md { font-size: 60px; }
   .q-text.sm { font-size: 50px; }
@@ -253,6 +262,7 @@
   #dock button { border: 0; background: transparent; color: #fff; height: 40px; min-width: 40px; padding: 0 12px; border-radius: 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
   #dock button:hover { background: rgba(255, 255, 255, 0.12); }
   #dock button:disabled { opacity: 0.3; background: transparent; }
+  #dock button[hidden] { display: none; }
   #dock .label { min-width: 120px; text-align: center; font-weight: 700; }
   #dock .sep { width: 1px; height: 22px; background: rgba(255, 255, 255, 0.2); margin: 0 4px; }
   #dock .conn { width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; margin: 0 8px 0 6px; }
@@ -339,6 +349,7 @@
   <button id="prevBtn" title="이전 (←)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
   <span class="label" id="stepLabel">-</span>
   <button id="nextBtn" title="다음 (→)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+  <button id="timerBtn" title="이 문제의 시간을 처음부터 다시 재요" hidden>20초 다시</button>
   <span class="sep"></span>
   <button id="fsBtn" title="전체화면 (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>전체화면</button>
   <button id="setBtn" title="설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>설정</button>
@@ -474,6 +485,41 @@ async function loadQuestions() {
   renderedKey = null;
 }
 
+// 제한시간: 시계가 어긋나도 맞도록 서버의 남은 시간을 받아 이 화면에서 줄여 나간다
+let timerEnd = null;
+let timerNo = 0;
+let timerLimit = 20000;
+let timerOff = false;
+function syncTimer() {
+  const cur = status.current;
+  const open = cur && status.state.stage === 'q' && !status.state.revealed;
+  timerOff = !!open && cur.remaining_ms == null;
+  if (!open || cur.remaining_ms == null) { timerEnd = null; timerNo = 0; return; }
+  timerLimit = cur.limit_ms;
+  const end = performance.now() + cur.remaining_ms;
+  if (timerNo !== cur.no || Math.abs(end - timerEnd) > 400) { timerEnd = end; timerNo = cur.no; }
+}
+function paintTimer() {
+  requestAnimationFrame(paintTimer);
+  const el = stageEl.querySelector('[data-timer]');
+  const st = steps[stepIdx];
+  if (!el || st?.stage !== 'q') return;
+  el.hidden = timerOff;
+  // 새 문제로 넘어온 직후 서버 응답이 오기 전에는 꽉 찬 시간을 보여 준다
+  const left = timerNo === st.qno ? Math.max(0, timerEnd - performance.now()) : timerLimit;
+  const over = left === 0;
+  el.querySelector('[data-arc]').style.strokeDashoffset = 100 * (1 - left / timerLimit);
+  const label = over ? '마감' : String(Math.ceil(left / 1000));
+  const sec = el.querySelector('[data-sec]');
+  if (sec.textContent !== label) sec.textContent = label;
+  el.classList.toggle('over', over);
+  el.classList.toggle('urgent', !over && left <= 5000);
+  const live = stageEl.querySelector('[data-live]');
+  const text = st.revealed ? '정답 공개' : over ? '응답 마감' : '응답 받는 중';
+  if (live && live.textContent !== text) live.textContent = text;
+}
+requestAnimationFrame(paintTimer);
+
 let qnaCount = 0;
 let pollTimer;
 async function refresh() {
@@ -488,6 +534,7 @@ async function refresh() {
       steps = buildSteps(questions.length, qnaCount);
     }
     status = s;
+    syncTimer();
     if (!navBusy && seq === navSeq) stepIdx = indexOfState(s.state);
     render();
   } catch (e) {
@@ -546,6 +593,7 @@ function render() {
   document.getElementById('stepLabel').textContent = stepName(st);
   document.getElementById('prevBtn').disabled = stepIdx === 0;
   document.getElementById('nextBtn').disabled = stepIdx === steps.length - 1;
+  document.getElementById('timerBtn').hidden = !(st.stage === 'q' && !st.revealed);
   const key = st.stage + (st.qno || '');
   if (key !== renderedKey) {
     renderedKey = key;
@@ -598,7 +646,7 @@ const VIEWS = {
           <div class="qna-badge">조합원 질문</div>
           <div class="qna-of" data-of></div>
           <div class="q-progress" data-progress></div>
-          <div class="mini-qr"><div class="qr">${qrSvg(joinUrl)}</div><span>지금도<br>참여 가능</span></div>
+          <div class="mini-qr"><div class="qr">${qrSvg(joinUrl)}</div></div>
         </header>
         <div class="qna-body"><p class="qna-text" data-text></p></div>
         <footer class="qna-foot">위원장 답변</footer>
@@ -625,10 +673,14 @@ const VIEWS = {
       return `
         <section class="slide question">
           <header class="q-head">
-            <div class="q-badge">Q<span>${pad2(st.qno)}</span></div>
+            <div class="q-badge">Q${pad2(st.qno)}</div>
             <div class="q-of">/ ${pad2(total())}</div>
             <div class="q-progress">${questions.map((x) => `<i class="${x.no < st.qno ? 'done' : x.no === st.qno ? 'now' : ''}"></i>`).join('')}</div>
-            <div class="mini-qr"><div class="qr">${qrSvg(joinUrl)}</div><span>지금도<br>참여 가능</span></div>
+            <div class="q-timer" data-timer aria-label="남은 시간">
+              <svg viewBox="0 0 100 100" aria-hidden="true"><circle class="track" cx="50" cy="50" r="45"/><circle class="arc" data-arc cx="50" cy="50" r="45" pathLength="100"/></svg>
+              <b data-sec>20</b>
+            </div>
+            <div class="mini-qr"><div class="qr">${qrSvg(joinUrl)}</div></div>
           </header>
           <h2 class="q-text ${size}">${h(q.question)}</h2>
           <div class="options n${q.options.length}${short ? ' short' : ''}">
@@ -661,7 +713,6 @@ const VIEWS = {
       const counts = cur ? cur.counts : [];
       const answered = counts.reduce((a, b) => a + b, 0);
       const people = status.participants.length;
-      root.querySelector('[data-live]').textContent = st.revealed ? '정답 공개' : '응답 받는 중';
       root.querySelector('[data-ans]').textContent = answered;
       root.querySelector('[data-total]').textContent = people;
       root.querySelector('[data-meter]').style.width = people ? `${Math.min(100, (answered / people) * 100)}%` : '0';
@@ -1370,6 +1421,15 @@ function confetti(canvas) {
 document.getElementById('prevBtn').onclick = (e) => { e.currentTarget.blur(); prev(); };
 document.getElementById('nextBtn').onclick = (e) => { e.currentTarget.blur(); go(stepIdx + 1); };
 document.getElementById('fsBtn').onclick = (e) => { e.currentTarget.blur(); toggleFs(); };
+document.getElementById('timerBtn').onclick = async (e) => {
+  e.currentTarget.blur();
+  try {
+    await rpc('quiz_admin_restart_timer', { p_pin: pin });
+    refresh();
+  } catch (err) {
+    toast(err.message);
+  }
+};
 document.getElementById('setBtn').onclick = (e) => { e.currentTarget.blur(); openSettings(); };
 function toggleFs() {
   if (document.fullscreenElement) document.exitFullscreen();
