@@ -313,8 +313,6 @@
   .ask-actions button:disabled { opacity: 0.35; cursor: default; }
   .ask-actions button.del { margin-left: auto; background: #fff0f2; color: var(--danger); }
   .ask-empty { margin: 0; padding: 32px 16px; text-align: center; color: var(--muted); font-size: 15px; }
-  .ask-create { display: flex; flex-direction: column; gap: 10px; }
-  .ask-create .btn { align-self: flex-start; }
   @media (max-width: 600px) {
     #settings .tabs { flex: none; flex-wrap: wrap; padding-left: 12px; padding-right: 12px; }
     #settings .body { padding-left: 14px; padding-right: 14px; }
@@ -1405,8 +1403,6 @@ let draft = [];
 let asks = [];
 let askOpen = true;
 let askFilter = 'new';
-let askPass = ''; // 질문함 비밀번호: 어디에도 저장하지 않고, 설정 창을 닫으면 잊는다
-let askHasPass = false;
 
 async function openSettings() {
   try {
@@ -1416,38 +1412,25 @@ async function openSettings() {
       answer: q.answer,
       explanation: q.explanation,
     }));
-    if (tab === 'asks') await enterAsks();
+    await loadAsks();
   } catch (e) { toast(e.message); return; }
   setDlg.showModal();
   renderTab();
 }
 document.getElementById('closeSettings').onclick = () => setDlg.close();
-// 창을 닫으면(Esc 포함) 질문함을 다시 잠근다
-setDlg.addEventListener('close', lockAsks);
 document.getElementById('tabs').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-tab]');
   if (!b) return;
   tab = b.dataset.tab;
   document.querySelectorAll('#tabs button').forEach((x) => x.classList.toggle('on', x === b));
   if (tab === 'asks') {
-    try { await enterAsks(); } catch (err) { toast(err.message); }
+    try { await loadAsks(); } catch (err) { toast(err.message); }
   }
   renderTab();
 });
 
-async function enterAsks() {
-  if (askPass) await loadAsks();
-  else askHasPass = await rpc('quiz_ask_has_pass', { p_pin: pin });
-}
-
-function lockAsks() {
-  askPass = '';
-  asks = [];
-  document.getElementById('askBadge').hidden = true;
-}
-
 async function loadAsks() {
-  const r = await rpc('quiz_admin_asks', { p_pass: askPass });
+  const r = await rpc('quiz_admin_asks', { p_pin: pin });
   asks = r.items;
   askOpen = r.open;
   const fresh = asks.filter((a) => a.status === 'new').length;
@@ -1564,28 +1547,6 @@ function renderTab() {
         </div>
       </div>`;
     setFoot.innerHTML = '';
-  } else if (tab === 'asks' && !askPass) {
-    setBody.innerHTML = askHasPass ? `
-      <div class="set-section">
-        <h3>질문함이 잠겨 있어요</h3>
-        <p>질문함 비밀번호를 입력해야 질문을 볼 수 있어요. 진행용 PIN으로는 열리지 않고, 설정 창을 닫으면 다시 잠겨요.</p>
-        <form class="set-row" data-ask-form="unlock">
-          <input class="field" id="askPassInput" type="password" autocomplete="off" placeholder="질문함 비밀번호" required>
-          <button class="btn" type="submit">열기</button>
-        </form>
-      </div>` : `
-      <div class="set-section">
-        <h3>질문함 비밀번호 만들기</h3>
-        <p>조합원 질문은 이 비밀번호를 아는 사람만 볼 수 있어요. 진행용 PIN으로는 열리지 않아요.</p>
-        <p>10자 이상으로 정하고, 숫자만으로는 만들 수 없어요. 화면에서 다시 찾아볼 수 없으니 잊지 않게 따로 적어 두세요.</p>
-        <form class="ask-create" data-ask-form="create">
-          <input class="field" id="askNew" type="password" autocomplete="new-password" placeholder="새 비밀번호" required>
-          <input class="field" id="askNew2" type="password" autocomplete="new-password" placeholder="새 비밀번호 한 번 더" required>
-          <button class="btn" type="submit">만들기</button>
-        </form>
-      </div>`;
-    setFoot.innerHTML = '';
-    setBody.querySelector('input').focus();
   } else if (tab === 'asks') {
     const list = asksOf(askFilter);
     const picks = asksOf('pick').length;
@@ -1604,17 +1565,9 @@ function renderTab() {
       <div class="ask-filter">
         ${filters.map(([f, name]) => `<button type="button" data-act="ask-filter" data-f="${f}" class="${askFilter === f ? 'on' : ''}">${name} ${asksOf(f).length}</button>`).join('')}
       </div>
-      ${list.map((a, i) => askCard(a, i, list.length)).join('') || `<p class="ask-empty">${asks.length ? '이 목록에는 질문이 없어요.' : '아직 접수된 질문이 없어요.'}</p>`}
-      <div class="set-section">
-        <h3>질문함 비밀번호 변경</h3>
-        <div class="set-row">
-          <input class="field" id="askChange" type="password" autocomplete="new-password" placeholder="새 비밀번호 (10자 이상)">
-          <button class="btn ghost" type="button" data-act="ask-pass">변경</button>
-        </div>
-      </div>`;
+      ${list.map((a, i) => askCard(a, i, list.length)).join('') || `<p class="ask-empty">${asks.length ? '이 목록에는 질문이 없어요.' : '아직 접수된 질문이 없어요.'}</p>`}`;
     setFoot.innerHTML = `
       <span class="note">답변 요청 질문을 순서대로 복사해요. 이름은 빠져요.</span>
-      <button class="btn ghost" type="button" data-act="ask-lock">잠그기</button>
       <button class="btn ghost" type="button" data-act="ask-reload">새로고침</button>
       <button class="btn" type="button" data-act="ask-copy" ${picks ? '' : 'disabled'}>답변 요청 ${picks}개 복사</button>`;
   } else {
@@ -1651,35 +1604,11 @@ setBody.addEventListener('change', async (e) => {
   const a = asks.find((x) => x.id === e.target.closest('.ask').dataset.id);
   a.edited = e.target.value.trim();
   try {
-    await rpc('quiz_admin_ask_update', { p_pass: askPass, p_id: a.id, p_edited: a.edited });
+    await rpc('quiz_admin_ask_update', { p_pin: pin, p_id: a.id, p_edited: a.edited });
     toast('문구를 저장했어요.');
   } catch (err) {
     toast(err.message);
   }
-});
-
-// 질문함 비밀번호 만들기·열기
-setBody.addEventListener('submit', async (e) => {
-  const kind = e.target.dataset.askForm;
-  if (!kind) return;
-  e.preventDefault();
-  try {
-    if (kind === 'create') {
-      const v = document.getElementById('askNew').value;
-      if (v !== document.getElementById('askNew2').value) throw new Error('두 비밀번호가 달라요.');
-      await rpc('quiz_ask_set_pass', { p_pin: pin, p_new: v });
-      askHasPass = true;
-      askPass = v;
-    } else {
-      askPass = document.getElementById('askPassInput').value;
-    }
-    await loadAsks();
-  } catch (err) {
-    askPass = '';
-    toast(err.message);
-    return;
-  }
-  renderTab();
 });
 
 setDlg.addEventListener('click', async (e) => {
@@ -1698,18 +1627,9 @@ setDlg.addEventListener('click', async (e) => {
       toast('링크를 복사했어요.');
     } else if (act === 'ask-toggle') {
       if (askOpen && !confirm('질문 접수를 마감할까요?\n링크를 열면 마감 안내가 보이고, 다시 열 수도 있어요.')) return;
-      await rpc('quiz_admin_ask_open', { p_pass: askPass, p_open: !askOpen });
+      await rpc('quiz_admin_ask_open', { p_pin: pin, p_open: !askOpen });
       await loadAsks();
       renderTab();
-    } else if (act === 'ask-lock') {
-      lockAsks();
-      renderTab();
-    } else if (act === 'ask-pass') {
-      const v = document.getElementById('askChange').value;
-      await rpc('quiz_ask_set_pass', { p_pin: pin, p_new: v, p_old: askPass });
-      askPass = v;
-      renderTab();
-      toast('질문함 비밀번호를 바꿨어요.');
     } else if (act === 'ask-reload') {
       await loadAsks();
       renderTab();
@@ -1719,7 +1639,7 @@ setDlg.addEventListener('click', async (e) => {
       await copyText(`본사2지부 조합원 사전 질문 ${picks.length}개\n\n${picks.map((a, n) => `${n + 1}. ${a.edited || a.body}`).join('\n\n')}`);
       toast(`질문 ${picks.length}개를 복사했어요.`);
     } else if (act === 'ask-pick' || act === 'ask-hold') {
-      await rpc('quiz_admin_ask_update', { p_pass: askPass, p_id: askId, p_status: act.slice(4) });
+      await rpc('quiz_admin_ask_update', { p_pin: pin, p_id: askId, p_status: act.slice(4) });
       await loadAsks();
       renderTab();
     } else if (act === 'ask-up' || act === 'ask-down') {
@@ -1727,12 +1647,12 @@ setDlg.addEventListener('click', async (e) => {
       const from = ids.indexOf(askId);
       const to = from + (act === 'ask-up' ? -1 : 1);
       [ids[from], ids[to]] = [ids[to], ids[from]];
-      await rpc('quiz_admin_ask_order', { p_pass: askPass, p_ids: ids });
+      await rpc('quiz_admin_ask_order', { p_pin: pin, p_ids: ids });
       await loadAsks();
       renderTab();
     } else if (act === 'ask-del') {
       if (!confirm('이 질문을 지울까요?\n되돌릴 수 없어요.')) return;
-      await rpc('quiz_admin_ask_delete', { p_pass: askPass, p_id: askId });
+      await rpc('quiz_admin_ask_delete', { p_pin: pin, p_id: askId });
       await loadAsks();
       renderTab();
     } else if (del) {

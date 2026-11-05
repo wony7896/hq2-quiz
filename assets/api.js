@@ -17,8 +17,6 @@ const ERRORS = {
   invalid_ask: '질문은 2자 이상 500자 이내로 적어 주세요.',
   invalid_ask_name: '이름은 30자 이내로 적어 주세요.',
   asks_full: '질문이 많이 접수되어 더 받을 수 없어요.',
-  invalid_ask_pass: '질문함 비밀번호가 맞지 않아요.',
-  ask_pass_too_weak: '비밀번호는 10자 이상이어야 하고, 숫자만으로는 만들 수 없어요.',
 };
 
 export class ApiError extends Error {
