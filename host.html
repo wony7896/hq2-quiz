@@ -42,18 +42,14 @@
   .qr svg { display: block; width: 100%; height: 100%; }
 
   /* ── 표지 ── */
-  .cover { display: grid; grid-template-columns: 1fr 780px; }
-  .cover-left { padding: 110px 100px 90px 120px; display: flex; flex-direction: column; min-width: 0; }
-  .cover-title { font-size: 128px; line-height: 1.08; font-weight: 900; letter-spacing: -0.035em; color: var(--b-navy); margin: 36px 0 0; }
-  .cover-sub { font-size: 56px; font-weight: 800; color: var(--b-blue); margin: 22px 0 0; letter-spacing: -0.02em; }
-  .steps { list-style: none; display: flex; gap: 20px; padding: 0; margin: 64px 0 0; }
-  .steps li { flex: 1; display: flex; align-items: center; gap: 20px; background: #fff; border-radius: 24px; padding: 26px 28px; box-shadow: var(--shadow); }
-  .steps b { flex: none; width: 64px; height: 64px; border-radius: 50%; background: var(--b-blue); color: #fff; display: grid; place-items: center; font-size: 32px; }
-  .steps span { font-size: 28px; font-weight: 700; line-height: 1.35; color: var(--ink); }
-  .joined { margin-top: auto; }
-  .joined-count { font-size: 40px; font-weight: 700; color: var(--ink-2); margin-bottom: 22px; }
-  .joined-count strong { font-size: 76px; font-weight: 900; color: var(--b-blue); margin-right: 6px; font-variant-numeric: tabular-nums; }
-  .joined .chips { max-height: 204px; overflow: hidden; }
+  .cover { display: grid; grid-template-columns: 1fr 900px; }
+  .cover-left { padding: 96px 80px 90px 120px; display: flex; flex-direction: column; min-width: 0; }
+  .cover-org { font-size: 40px; font-weight: 800; color: var(--b-blue); letter-spacing: -0.01em; }
+  .cover-main { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+  .cover-title { font-size: 176px; line-height: 1.12; font-weight: 900; letter-spacing: -0.04em; color: var(--b-navy); margin: 0; }
+  .cover-sub { font-size: 60px; font-weight: 800; color: var(--b-blue); margin: 36px 0 0; letter-spacing: -0.02em; }
+  .joined-count { font-size: 44px; font-weight: 700; color: var(--ink-2); }
+  .joined-count strong { font-size: 84px; font-weight: 900; color: var(--b-blue); margin-right: 8px; font-variant-numeric: tabular-nums; }
   .cover-right {
     position: relative; overflow: hidden;
     background: radial-gradient(circle at 80% 0%, #3d77ff 0%, transparent 55%), linear-gradient(160deg, var(--b-blue) 0%, var(--b-navy) 100%);
@@ -62,11 +58,25 @@
   .cover-right::before, .cover-right::after { content: ''; position: absolute; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.12); }
   .cover-right::before { width: 900px; height: 900px; left: -200px; bottom: -520px; }
   .cover-right::after { width: 560px; height: 560px; right: -240px; top: -200px; }
-  .qr-card { position: relative; z-index: 1; background: #fff; border-radius: 40px; padding: 36px; box-shadow: 0 40px 80px rgba(3, 12, 45, 0.35); }
-  .qr-card .qr { width: 520px; height: 520px; }
-  .qr-caption { position: relative; z-index: 1; margin-top: 44px; text-align: center; }
-  .qr-caption b { display: block; font-size: 44px; font-weight: 800; }
-  .qr-caption span { display: block; margin-top: 12px; font-size: 28px; opacity: 0.8; font-weight: 600; letter-spacing: 0.01em; }
+  .qr-card { position: relative; z-index: 1; background: #fff; border-radius: 44px; padding: 40px; box-shadow: 0 40px 80px rgba(3, 12, 45, 0.35); }
+  .qr-card .qr { width: 680px; height: 680px; }
+  .qr-caption { position: relative; z-index: 1; margin-top: 40px; text-align: center; }
+  .qr-caption b { display: block; font-size: 52px; font-weight: 800; }
+  .qr-caption span { display: block; margin-top: 12px; font-size: 30px; opacity: 0.8; font-weight: 600; letter-spacing: 0.01em; }
+
+  /* ── 조합원 질문 ── */
+  .qna {
+    padding: 60px 96px 64px; color: #fff;
+    background: radial-gradient(circle at 85% 0%, #3d77ff 0%, transparent 55%), linear-gradient(160deg, var(--b-blue) 0%, var(--b-navy) 100%);
+  }
+  .qna-badge { background: #fff; color: var(--b-blue); border-radius: 26px; padding: 22px 34px; font-weight: 900; font-size: 44px; white-space: nowrap; }
+  .qna-of { font-size: 44px; font-weight: 800; opacity: 0.85; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .qna .q-progress i { background: rgba(255, 255, 255, 0.22); }
+  .qna .q-progress i.done { background: #fff; }
+  .qna .q-progress i.now { background: #fff; opacity: 0.6; }
+  .qna-body { flex: 1; min-height: 0; display: flex; align-items: center; margin: 36px 0; }
+  .qna-text { margin: 0; width: 100%; font-weight: 800; line-height: 1.38; letter-spacing: -0.025em; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .qna-foot { font-size: 40px; font-weight: 800; color: var(--gold); }
 
   /* ── 문제 ── */
   .question { padding: 60px 96px 56px; }
@@ -389,7 +399,6 @@ let navBusy = false;
 let navSeq = 0;
 let drawing = false;
 let overlayOpen = false;
-let seenIds = new Set();
 let voterSeen = new Set();
 let arenaSig = '';
 const drawPref = JSON.parse(store.get(DRAW_KEY) || '{"mode":"all","k":7}');
@@ -432,8 +441,9 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const total = () => questions.length;
 
 // ───────── 단계 ─────────
-function buildSteps(n) {
+function buildSteps(n, qnaCount) {
   const list = [{ stage: 'cover' }];
+  for (let i = 1; i <= qnaCount; i++) list.push({ stage: 'qna', qno: i });
   for (let i = 1; i <= n; i++) {
     list.push({ stage: 'q', qno: i, revealed: false });
     list.push({ stage: 'q', qno: i, revealed: true });
@@ -445,11 +455,14 @@ function buildSteps(n) {
 function indexOfState(s) {
   const i = steps.findIndex((st) => st.stage === s.stage && (st.qno || 0) === (s.qno || 0)
     && (st.stage !== 'q' || st.revealed === s.revealed));
-  return i < 0 ? 0 : i;
+  if (i >= 0) return i;
+  // 보여 주던 질문이 목록에서 빠지면 남은 질문 중 마지막에 머문다
+  return s.stage === 'qna' ? Math.max(0, steps.map((st) => st.stage).lastIndexOf('qna')) : 0;
 }
 function stepName(st) {
   if (!st) return '-';
   if (st.stage === 'qdraw') return `Q${st.qno} 정답자 추첨`;
+  if (st.stage === 'qna') return `조합원 질문 ${st.qno}`;
   return { cover: '표지 · QR', result: '퀴즈 결과', draw: '경품 추첨', end: '마무리' }[st.stage]
     || `Q${st.qno} ${st.revealed ? '정답 공개' : '응답 받는 중'}`;
 }
@@ -457,10 +470,11 @@ function stepName(st) {
 // ───────── 데이터 ─────────
 async function loadQuestions() {
   questions = await rpc('quiz_admin_questions', { p_pin: pin });
-  steps = buildSteps(questions.length);
+  steps = buildSteps(questions.length, qnaCount);
   renderedKey = null;
 }
 
+let qnaCount = 0;
 let pollTimer;
 async function refresh() {
   clearTimeout(pollTimer);
@@ -469,6 +483,10 @@ async function refresh() {
     const s = await rpc('quiz_admin_status', { p_pin: pin });
     setConn(true);
     if (s.state.total !== questions.length) await loadQuestions();
+    if (s.qna.length !== qnaCount) {
+      qnaCount = s.qna.length;
+      steps = buildSteps(questions.length, qnaCount);
+    }
     status = s;
     if (!navBusy && seq === navSeq) stepIdx = indexOfState(s.state);
     render();
@@ -539,44 +557,62 @@ function render() {
   VIEWS[st.stage].update(st);
 }
 
+function shrinkToFit(el, sizes, maxHeight) {
+  for (const size of sizes) {
+    el.style.fontSize = `${size}px`;
+    if (el.offsetHeight <= maxHeight && el.scrollWidth <= el.clientWidth) return;
+  }
+}
+
 const VIEWS = {
   cover: {
     html: () => `
       <section class="slide cover">
         <div class="cover-left">
-          <div class="eyebrow"><span class="dot"></span>실시간 참여 퀴즈</div>
-          <h1 class="cover-title" data-title></h1>
-          <p class="cover-sub" data-subtitle></p>
-          <ol class="steps">
-            <li><b>1</b><span>카메라로<br>QR 스캔</span></li>
-            <li><b>2</b><span>참여 아이디<br>입력</span></li>
-            <li><b>3</b><span>퀴즈 풀고<br>경품 추첨!</span></li>
-          </ol>
-          <div class="joined">
-            <div class="joined-count"><strong data-count>0</strong>명 참여 중</div>
-            <div class="chips" data-chips></div>
+          <div class="cover-org">SK브로드밴드노동조합</div>
+          <div class="cover-main">
+            <h1 class="cover-title" data-title></h1>
+            <p class="cover-sub" data-subtitle></p>
           </div>
+          <div class="joined-count"><strong data-count>0</strong>명 참여 중</div>
         </div>
         <div class="cover-right">
           <div class="qr-card"><div class="qr">${qrSvg(joinUrl)}</div></div>
           <div class="qr-caption"><b>QR을 찍고 참여하세요</b><span>${h(joinUrlText)}</span></div>
         </div>
       </section>`,
-    mount() {
-      seenIds = new Set((status?.participants || []).map((p) => p.id));
-    },
     update() {
       const root = stageEl.querySelector('.cover');
-      root.querySelector('[data-title]').textContent = status.state.title;
+      const title = root.querySelector('[data-title]');
+      title.textContent = status.state.title;
       root.querySelector('[data-subtitle]').textContent = status.state.subtitle;
-      const ps = status.participants;
-      root.querySelector('[data-count]').textContent = ps.length;
-      const shown = ps.slice(-28).reverse();
-      const rest = ps.length - shown.length;
-      root.querySelector('[data-chips]').innerHTML =
-        shown.map((p) => `<span class="chip${seenIds.has(p.id) ? '' : ' new'}">${h(p.nickname)}</span>`).join('') +
-        (rest > 0 ? `<span class="chip more">외 ${rest}명</span>` : '');
-      ps.forEach((p) => seenIds.add(p.id));
+      root.querySelector('[data-count]').textContent = status.participants.length;
+      shrinkToFit(title, [176, 150, 128, 108, 92, 76], 620);
+    },
+  },
+
+  qna: {
+    html: () => `
+      <section class="slide qna">
+        <header class="q-head">
+          <div class="qna-badge">조합원 질문</div>
+          <div class="qna-of" data-of></div>
+          <div class="q-progress" data-progress></div>
+          <div class="mini-qr"><div class="qr">${qrSvg(joinUrl)}</div><span>지금도<br>참여 가능</span></div>
+        </header>
+        <div class="qna-body"><p class="qna-text" data-text></p></div>
+        <footer class="qna-foot">위원장 답변</footer>
+      </section>`,
+    update(st) {
+      const root = stageEl.querySelector('.qna');
+      const list = status.qna;
+      const item = list[st.qno - 1];
+      if (!item) return;
+      root.querySelector('[data-of]').textContent = `${st.qno} / ${list.length}`;
+      root.querySelector('[data-progress]').innerHTML = list.map((_, i) => `<i class="${i + 1 < st.qno ? 'done' : i + 1 === st.qno ? 'now' : ''}"></i>`).join('');
+      const text = root.querySelector('[data-text]');
+      text.textContent = item.text;
+      shrinkToFit(text, [104, 92, 80, 68, 58, 50, 44, 38, 34], root.querySelector('.qna-body').clientHeight);
     },
   },
 
@@ -1439,7 +1475,7 @@ async function loadAsks() {
   badge.hidden = !fresh;
 }
 
-// 답변 요청은 정한 순서대로, 나머지는 최근에 온 질문부터 보여 준다
+// 올릴 질문은 정한 순서대로, 나머지는 최근에 온 질문부터 보여 준다
 function asksOf(filter) {
   if (filter === 'all') return asks;
   const list = asks.filter((a) => a.status === filter);
@@ -1455,7 +1491,7 @@ function askTime(s) {
 
 function askCard(a, i, total) {
   const ordering = askFilter === 'pick';
-  const label = { new: '새 질문', pick: '답변 요청', hold: '보류' }[a.status];
+  const label = { new: '새 질문', pick: '올릴 질문', hold: '보류' }[a.status];
   return `
     <article class="ask" data-id="${a.id}">
       <div class="ask-head">
@@ -1465,12 +1501,12 @@ function askCard(a, i, total) {
         ${askFilter === 'all' ? `<em>${label}</em>` : ''}
       </div>
       <p class="ask-body">${h(a.body)}</p>
-      ${a.status === 'pick' || a.edited ? `<textarea class="field" data-ask-edit maxlength="500" placeholder="위원장에게 전달할 문구로 다듬기 (비워 두면 원문 그대로 전달)">${h(a.edited)}</textarea>` : ''}
+      ${a.status === 'pick' || a.edited ? `<textarea class="field" data-ask-edit maxlength="500" placeholder="화면에 띄울 문구로 다듬기 (비워 두면 원문 그대로 표시)">${h(a.edited)}</textarea>` : ''}
       <div class="ask-actions">
         ${ordering ? `
           <button type="button" data-act="ask-up" title="위로" ${i === 0 ? 'disabled' : ''}>▲</button>
           <button type="button" data-act="ask-down" title="아래로" ${i === total - 1 ? 'disabled' : ''}>▼</button>` : ''}
-        ${a.status !== 'pick' ? '<button type="button" data-act="ask-pick">답변 요청</button>' : ''}
+        ${a.status !== 'pick' ? '<button type="button" data-act="ask-pick">화면에 올리기</button>' : ''}
         ${a.status !== 'hold' ? '<button type="button" data-act="ask-hold">보류</button>' : ''}
         <button type="button" class="del" data-act="ask-del">삭제</button>
       </div>
@@ -1550,7 +1586,7 @@ function renderTab() {
   } else if (tab === 'asks') {
     const list = asksOf(askFilter);
     const picks = asksOf('pick').length;
-    const filters = [['new', '새 질문'], ['pick', '답변 요청'], ['hold', '보류'], ['all', '전체']];
+    const filters = [['new', '새 질문'], ['pick', '올릴 질문'], ['hold', '보류'], ['all', '전체']];
     setBody.innerHTML = `
       <div class="warn">질문 원문이 보이는 화면이에요. 스크린에 띄운 상태라면 화면 공유를 끄고 정리하세요.</div>
       <div class="set-section">
@@ -1567,9 +1603,9 @@ function renderTab() {
       </div>
       ${list.map((a, i) => askCard(a, i, list.length)).join('') || `<p class="ask-empty">${asks.length ? '이 목록에는 질문이 없어요.' : '아직 접수된 질문이 없어요.'}</p>`}`;
     setFoot.innerHTML = `
-      <span class="note">답변 요청 질문을 순서대로 복사해요.</span>
+      <span class="note">올릴 질문은 이 순서대로 표지 다음 화면에 나와요. 복사해서 위원장에게 미리 전달할 수도 있어요.</span>
       <button class="btn ghost" type="button" data-act="ask-reload">새로고침</button>
-      <button class="btn" type="button" data-act="ask-copy" ${picks ? '' : 'disabled'}>답변 요청 ${picks}개 복사</button>`;
+      <button class="btn" type="button" data-act="ask-copy" ${picks ? '' : 'disabled'}>올릴 질문 ${picks}개 복사</button>`;
   } else {
     setBody.innerHTML = `
       <div class="set-section">
@@ -1706,7 +1742,6 @@ setDlg.addEventListener('click', async (e) => {
     } else if (act === 'reset-all') {
       if (!confirm('참여자, 답변, 당첨 기록을 모두 지우고 표지로 돌아갈까요?\n되돌릴 수 없어요.')) return;
       await rpc('quiz_admin_reset', { p_pin: pin, p_scope: 'all' });
-      seenIds = new Set();
       await refresh();
       renderTab();
       toast('전체 초기화했어요.');

@@ -177,6 +177,7 @@ function render() {
     return show(`win-${w.qno}-${w.rank}`, winView);
   }
   if (s.stage === 'cover') return show('wait', waitView);
+  if (s.stage === 'qna') return show('qna', qnaView);
   if ((s.stage === 'q' || s.stage === 'qdraw') && me.question) {
     const q = me.question;
     const mode = s.stage === 'qdraw' ? 'draw' : s.revealed ? 'reveal' : q.my_choice != null ? 'locked' : 'open';
@@ -215,6 +216,16 @@ function waitView() {
       <h2>참여 완료!</h2>
       <div class="me">${h(me.nickname)}</div>
       <p>곧 퀴즈가 시작돼요.<br>앞 화면을 봐 주세요.</p>
+    </div>
+    <p class="muted">화면을 끄지 말고 기다려 주세요. 문제가 나오면 자동으로 바뀌어요.</p>`;
+}
+
+function qnaView() {
+  return `
+    <div class="card center">
+      <h2>조합원 질문 시간이에요</h2>
+      <div class="me">${h(me.nickname)}</div>
+      <p>앞 화면을 봐 주세요.<br>끝나면 퀴즈가 시작돼요.</p>
     </div>
     <p class="muted">화면을 끄지 말고 기다려 주세요. 문제가 나오면 자동으로 바뀌어요.</p>`;
 }
