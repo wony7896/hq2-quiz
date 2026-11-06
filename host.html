@@ -349,7 +349,7 @@
   <button id="prevBtn" title="이전 (←)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
   <span class="label" id="stepLabel">-</span>
   <button id="nextBtn" title="다음 (→)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
-  <button id="timerBtn" title="이 문제의 시간을 처음부터 다시 재요" hidden>20초 다시</button>
+  <button id="timerBtn" title="이 문제의 시간을 처음부터 다시 재요" hidden>30초 다시</button>
   <span class="sep"></span>
   <button id="fsBtn" title="전체화면 (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>전체화면</button>
   <button id="setBtn" title="설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>설정</button>
@@ -488,14 +488,18 @@ async function loadQuestions() {
 // 제한시간: 시계가 어긋나도 맞도록 서버의 남은 시간을 받아 이 화면에서 줄여 나간다
 let timerEnd = null;
 let timerNo = 0;
-let timerLimit = 20000;
+let timerLimit = 30000;
 let timerOff = false;
 function syncTimer() {
   const cur = status.current;
   const open = cur && status.state.stage === 'q' && !status.state.revealed;
   timerOff = !!open && cur.remaining_ms == null;
+  // 제한시간은 서버 값 하나만 고치면 되도록 화면 문구도 여기서 맞춘다
+  if (cur?.limit_ms) {
+    timerLimit = cur.limit_ms;
+    document.getElementById('timerBtn').textContent = `${timerLimit / 1000}초 다시`;
+  }
   if (!open || cur.remaining_ms == null) { timerEnd = null; timerNo = 0; return; }
-  timerLimit = cur.limit_ms;
   const end = performance.now() + cur.remaining_ms;
   if (timerNo !== cur.no || Math.abs(end - timerEnd) > 400) { timerEnd = end; timerNo = cur.no; }
 }
@@ -678,7 +682,7 @@ const VIEWS = {
             <div class="q-progress">${questions.map((x) => `<i class="${x.no < st.qno ? 'done' : x.no === st.qno ? 'now' : ''}"></i>`).join('')}</div>
             <div class="q-timer" data-timer aria-label="남은 시간">
               <svg viewBox="0 0 100 100" aria-hidden="true"><circle class="track" cx="50" cy="50" r="45"/><circle class="arc" data-arc cx="50" cy="50" r="45" pathLength="100"/></svg>
-              <b data-sec>20</b>
+              <b data-sec>${timerLimit / 1000}</b>
             </div>
             <div class="mini-qr"><div class="qr">${qrSvg(joinUrl)}</div></div>
           </header>
