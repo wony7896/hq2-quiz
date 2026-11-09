@@ -183,9 +183,10 @@
   .pill.on em { color: var(--b-blue); }
   .pill .step { width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--b-sky-2); color: var(--b-blue-700); font-size: 34px; font-weight: 900; line-height: 1; display: grid; place-items: center; }
   .pill .step:hover { background: var(--b-sky-3); }
+  .pill .step:disabled { opacity: 0.35; cursor: default; background: var(--b-sky-2); }
   .pill b { min-width: 40px; text-align: center; font-size: 36px; color: var(--ink); }
 
-  .draw-body { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: 1fr 380px; gap: 48px; margin-top: 40px; min-height: 0; pointer-events: none; }
+  .draw-body { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: 1fr; margin-top: 40px; min-height: 0; pointer-events: none; }
   .draw-body > * { pointer-events: auto; }
   .slot-wrap { display: grid; place-items: center; }
   .slot {
@@ -198,7 +199,6 @@
   .slot-name.ready { color: var(--b-sky-3); font-size: 120px; }
   .slot-hint { font-size: 30px; font-weight: 600; color: var(--muted); }
   .slot-hint kbd { font: inherit; font-weight: 800; color: var(--ink-2); background: var(--b-sky); border-radius: 10px; padding: 4px 14px; margin: 0 4px; }
-  .draw.qd .draw-body { grid-template-columns: 1fr; }
   .slot-wrap { min-height: 0; }
   .slot-wrap.show-roster .slot, .slot-wrap:not(.show-roster) .roster-box { display: none; }
   .roster-box { display: flex; flex-direction: column; align-items: center; gap: 40px; width: 100%; }
@@ -209,20 +209,6 @@
   .slot-actions[hidden] { display: none; }
   .slot .again { margin-top: 20px; border: 0; background: var(--b-sky); color: var(--b-blue-700); font-size: 26px; font-weight: 800; padding: 12px 30px; border-radius: 999px; }
   .slot .again:hover { background: var(--b-sky-2); }
-
-  .winners { background: #fff; border-radius: 36px; padding: 34px 30px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 0; }
-  .winners h3 { margin: 0 0 20px; font-size: 32px; font-weight: 800; display: flex; align-items: center; gap: 12px; }
-  .winners h3 small { font-size: 26px; color: var(--muted); font-weight: 700; }
-  .winners ol { list-style: none; margin: 0; padding: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
-  .winners li { display: flex; align-items: center; gap: 16px; font-size: 32px; font-weight: 800; padding: 10px 12px; border-radius: 18px; }
-  .winners li:hover { background: var(--b-sky); }
-  .winners li i { flex: none; font-style: normal; min-width: 52px; height: 52px; padding: 0 12px; border-radius: 26px; background: var(--b-blue); color: #fff; display: grid; place-items: center; font-size: 26px; }
-  .winners li i.q { background: var(--b-sky); color: var(--b-blue-700); }
-  .winners li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .winners li button { opacity: 0; border: 0; background: transparent; color: var(--muted); font-size: 22px; font-weight: 700; padding: 6px 10px; border-radius: 10px; }
-  .winners li:hover button { opacity: 1; }
-  .winners li button:hover { background: #fff; color: var(--danger); }
-  .winners .empty { font-size: 26px; color: var(--muted); font-weight: 600; line-height: 1.5; }
 
   .wheel { position: absolute; inset: 0; z-index: 5; width: 1920px; height: 1080px; pointer-events: none; }
   .wheel[hidden] { display: none; }
@@ -389,7 +375,6 @@
 import { rpc, escapeHtml as h } from './assets/api.js';
 
 const PIN_KEY = 'hq2quiz.pin';
-const DRAW_KEY = 'hq2quiz.draw';
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
@@ -412,7 +397,10 @@ let drawing = false;
 let overlayOpen = false;
 let voterSeen = new Set();
 let arenaSig = '';
-const drawPref = JSON.parse(store.get(DRAW_KEY) || '{"mode":"all","k":7}');
+// 마지막 추첨의 정답 기준: 처음에는 만점(문제 수). 만점자가 없으면 진행자가 − 로 낮출 수 있다
+let finalMin = null;
+const minScore = () => Math.max(1, Math.min(total() || 1, finalMin ?? total()));
+const finalTitle = () => (minScore() === total() ? '만점자 추첨' : `정답 ${minScore()}개 이상 추첨`);
 
 // ───────── 공통 ─────────
 function fit() {
@@ -474,7 +462,7 @@ function stepName(st) {
   if (!st) return '-';
   if (st.stage === 'qdraw') return `Q${st.qno} 정답자 추첨`;
   if (st.stage === 'qna') return `조합원 질문 ${st.qno}`;
-  return { cover: '표지 · QR', result: '퀴즈 결과', draw: '경품 추첨', end: '마무리' }[st.stage]
+  return { cover: '표지 · QR', result: '퀴즈 결과', draw: '만점자 추첨', end: '마무리' }[st.stage]
     || `Q${st.qno} ${st.revealed ? '정답 공개' : '응답 받는 중'}`;
 }
 
@@ -579,8 +567,8 @@ function next() {
   if (st?.stage === 'draw' || st?.stage === 'qdraw') {
     if (overlayOpen) { closeOverlay(); return; }
     if (drawing) return;
-    // 문제 정답자 추첨은 한 명 뽑았거나 뽑을 사람이 없으면 다음 화면으로 넘어간다
-    const done = st.stage === 'qdraw' && (qWinners(st).length > 0 || drawPool(st).length === 0);
+    // 한 명 뽑았거나 뽑을 사람이 없으면 다음 화면으로 넘어간다 (더 뽑으려면 '한 명 더 추첨')
+    const done = winnersOf(st).length > 0 || drawPool(st).length === 0;
     if (!done) { startDraw(); return; }
   }
   go(stepIdx + 1);
@@ -768,40 +756,39 @@ const VIEWS = {
     },
   },
 
-  // 'draw' = 마지막 경품 추첨, 'qdraw' = n번 문제 정답자 추첨 (같은 화면을 함께 쓴다)
+  // 'qdraw' = n번 문제 정답자 추첨, 'draw' = 마지막 만점자 추첨 (같은 화면을 함께 쓴다)
+  // 뽑기 전에는 후보 아이디를 크게 보여 주고, 넘기면 룰렛으로 한 명을 뽑는다. 이미 당첨된 사람은 빠진다.
   draw: {
     html: (st) => {
       const qd = st.stage === 'qdraw';
       return `
-      <section class="slide draw${qd ? ' qd' : ''}">
+      <section class="slide draw">
         <div class="arena idle" data-arena></div>
         <header class="draw-head">
-          <h2 class="title">${qd ? `Q${st.qno} 정답자 추첨` : '경품 추첨'}</h2>
+          <h2 class="title" data-title>${qd ? `Q${st.qno} 정답자 추첨` : ''}</h2>
           <div class="pool-picker">${qd
             ? '<div class="pill on">정답자 <em data-correct-n></em></div>'
-            : `<button class="pill" data-mode="all">전체 참여자 <em data-all-n></em></button>
-            <div class="pill" data-mode="min">정답
+            : `<div class="pill on">정답
               <button class="step" data-k="-1" aria-label="기준 낮추기">−</button><b data-k-val></b><button class="step" data-k="1" aria-label="기준 높이기">+</button>
               개 이상 <em data-min-n></em></div>`}
           </div>
         </header>
         <div class="draw-body">
           <div class="slot-wrap" data-slot-wrap>
-            ${qd ? `<div class="roster-box">
+            <div class="roster-box">
               <div class="roster" data-roster></div>
               <div class="slot-hint" data-roster-hint></div>
-            </div>` : ''}
+            </div>
             <div class="slot" data-slot>
               <div class="slot-label">추첨 대상 <b data-pool-n>0</b>명</div>
               <div class="slot-name ready" data-slot-name>READY</div>
               <div class="slot-hint" data-slot-hint></div>
-              ${qd ? `<div class="slot-actions" data-actions hidden>
+              <div class="slot-actions" data-actions hidden>
                 <button class="again" data-again>한 명 더 추첨</button>
                 <button class="again" data-cancel>당첨 취소</button>
-              </div>` : ''}
+              </div>
             </div>
           </div>
-          ${qd ? '' : '<aside class="winners"><h3>당첨자 <small data-win-n></small></h3><ol data-win-list></ol></aside>'}
         </div>
         <canvas class="wheel" data-wheel hidden></canvas>
         <div class="win-overlay" data-overlay hidden>
@@ -810,7 +797,7 @@ const VIEWS = {
             <div class="win-rank" data-win-rank></div>
             <div class="win-label">축하합니다!</div>
             <div class="win-name" data-win-name></div>
-            <div class="win-hint">진행자에게 와 주세요 · <b>→</b> ${qd ? '계속' : '다음 추첨'}</div>
+            <div class="win-hint">진행자에게 와 주세요 · <b>→</b> 계속</div>
           </div>
         </div>
       </section>`;
@@ -825,70 +812,54 @@ const VIEWS = {
       root.querySelector('[data-cancel]')?.addEventListener('click', (e) => {
         e.currentTarget.blur();
         const st = steps[stepIdx];
-        const w = qWinners(st).at(-1);
+        const w = winnersOf(st).at(-1);
         if (!w || drawing || overlayOpen) return;
         if (!confirm(`'${w.nickname}' 당첨을 취소할까요?\n취소하면 다시 추첨할 수 있어요.`)) return;
         removeWinner(w.id);
       });
-      root.querySelectorAll('[data-mode]').forEach((el) => el.addEventListener('click', (e) => {
-        if (drawing) return;
-        const step = e.target.closest('[data-k]');
-        if (step) {
-          drawPref.k = Math.max(1, Math.min(total(), drawPref.k + Number(step.dataset.k)));
-        }
-        drawPref.mode = el.dataset.mode;
-        store.set(DRAW_KEY, JSON.stringify(drawPref));
-        e.currentTarget.blur?.();
+      // 마지막 추첨: 만점자가 없거나 모두 당첨됐으면 정답 기준을 낮출 수 있다
+      root.querySelectorAll('[data-k]').forEach((el) => el.addEventListener('click', (e) => {
+        e.currentTarget.blur();
+        if (drawing || overlayOpen) return;
+        finalMin = Math.max(1, Math.min(total(), minScore() + Number(el.dataset.k)));
         render();
       }));
-      root.querySelector('[data-win-list]')?.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-remove]');
-        if (!btn || drawing) return;
-        if (!confirm(`'${btn.dataset.name}' 당첨을 취소할까요?\n취소하면 다시 추첨 후보가 됩니다.`)) return;
-        removeWinner(Number(btn.dataset.remove));
-      });
     },
     update(st) {
       if (drawing) return;
       const root = stageEl.querySelector('.draw');
       const qd = st.stage === 'qdraw';
       const pool = drawPool(st);
+      const eligible = qualifiers(st);
       if (qd) {
-        const cur = currentOf(st);
-        root.querySelector('[data-correct-n]').textContent = `${cur ? cur.answers.filter((a) => a.choice === cur.answer).length : 0}명`;
+        root.querySelector('[data-correct-n]').textContent = `${eligible.length}명`;
       } else {
-        drawPref.k = Math.max(1, Math.min(total() || 1, drawPref.k));
-        const ps = status.participants.filter((p) => !p.won);
-        root.querySelector('[data-all-n]').textContent = `${ps.length}명`;
-        root.querySelector('[data-min-n]').textContent = `${ps.filter((p) => p.score >= drawPref.k).length}명`;
-        root.querySelector('[data-k-val]').textContent = drawPref.k;
-        root.querySelectorAll('[data-mode]').forEach((el) => el.classList.toggle('on', el.dataset.mode === drawPref.mode));
+        const k = minScore();
+        root.querySelector('[data-title]').textContent = finalTitle();
+        root.querySelector('[data-k-val]').textContent = k;
+        root.querySelector('[data-min-n]').textContent = `${eligible.length}명`;
+        root.querySelector('[data-k="-1"]').disabled = k <= 1;
+        root.querySelector('[data-k="1"]').disabled = k >= total();
       }
       root.querySelector('[data-pool-n]').textContent = pool.length;
 
-      // 오른쪽 당첨자 목록은 마지막 경품 추첨에만 있다 (문제별 당첨자도 Q번호와 함께 보여 준다)
-      const ws = status.winners;
-      if (!qd) {
-        root.querySelector('[data-win-n]').textContent = ws.length ? `${ws.length}명` : '';
-        root.querySelector('[data-win-list]').innerHTML = ws.length
-          ? ws.map((w) => `<li><i${w.qno ? ' class="q"' : ''}>${w.qno ? `Q${w.qno}` : w.rank}</i><span>${h(w.nickname)}</span><button data-remove="${w.id}" data-name="${h(w.nickname)}" title="당첨 취소">취소</button></li>`).join('')
-          : '<li class="empty">아직 당첨자가 없어요.<br>추첨을 시작해 보세요!</li>';
-      }
-
       if (overlayOpen) return;
-      // 추첨 상자: 대기 / 이 문제 당첨자 / 정답자 없음
-      const mine = qd ? qWinners(st) : [];
-      const after = st.qno < total() ? '다음 문제' : '퀴즈 결과';
+      // 추첨 상자: 대기 / 이번 추첨 당첨자 / 후보 없음
+      const mine = winnersOf(st);
+      const who = qd ? '정답자' : minScore() === total() ? '만점자' : '대상자';
+      const after = !qd ? '마무리' : st.qno < total() ? '다음 문제' : '퀴즈 결과';
       let name = 'READY';
-      let hint = `<kbd>Space</kbd> 또는 <kbd>→</kbd> 를 누르면 ${qd ? '정답자 중 한 명을 추첨합니다' : ws.some((w) => !w.qno) ? '다음 추첨을 시작합니다' : '추첨을 시작합니다'}`;
+      let hint = `<kbd>Space</kbd> 또는 <kbd>→</kbd> 를 누르면 ${who} 중 한 명을 추첨합니다`;
       if (mine.length) {
         name = mine[mine.length - 1].nickname;
         hint = `당첨을 축하합니다! · <kbd>→</kbd> ${after}`;
-      } else if (qd && !pool.length) {
-        const cur = currentOf(st);
-        const correctN = cur ? cur.answers.filter((a) => a.choice === cur.answer).length : 0;
-        name = correctN ? '추첨 대상 없음' : '정답자 없음';
-        hint = `${correctN ? `정답자 ${correctN}명이 모두 이미 당첨됐어요` : '이번 문제는 맞힌 사람이 없어요'} · <kbd>→</kbd> ${after}`;
+      } else if (!pool.length) {
+        name = eligible.length ? '추첨 대상 없음' : `${who} 없음`;
+        hint = eligible.length
+          ? `${who} ${eligible.length}명이 모두 이미 당첨됐어요`
+          : qd ? '이번 문제는 맞힌 사람이 없어요' : who === '만점자' ? '만점자가 없어요' : `정답 ${minScore()}개 이상인 사람이 없어요`;
+        if (!qd && minScore() > 1) hint += ' · 오른쪽 위 <kbd>−</kbd> 로 기준을 낮출 수 있어요';
+        hint += ` · <kbd>→</kbd> ${after}`;
       }
       const nameEl = root.querySelector('[data-slot-name]');
       if (nameEl.dataset.v !== name) {
@@ -906,14 +877,13 @@ const VIEWS = {
         root.querySelector('[data-again]').hidden = !pool.length;
       }
 
-      // 문제 정답자 추첨: 뽑기 전에는 정답자 아이디를 화면 가운데에 크게 보여 준다
-      const showRoster = qd && !mine.length && pool.length > 0;
+      // 뽑기 전에는 후보 아이디를 화면 가운데에 크게 보여 준다
+      const showRoster = !mine.length && pool.length > 0;
       root.querySelector('[data-slot-wrap]').classList.toggle('show-roster', showRoster);
       if (showRoster) {
-        const cur = currentOf(st);
-        const skipped = cur ? cur.answers.filter((a) => a.choice === cur.answer).length - pool.length : 0;
+        const skipped = eligible.length - pool.length;
         renderRoster(root.querySelector('[data-roster]'), pool);
-        const rh = `<kbd>Space</kbd> 또는 <kbd>→</kbd> 를 누르면 정답자 중 한 명을 추첨합니다${skipped > 0 ? ` · 이미 당첨된 ${skipped}명 제외` : ''}`;
+        const rh = `<kbd>Space</kbd> 또는 <kbd>→</kbd> 를 누르면 ${who} 중 한 명을 추첨합니다${skipped > 0 ? ` · 이미 당첨된 ${skipped}명 제외` : ''}`;
         const rhEl = root.querySelector('[data-roster-hint]');
         if (rhEl.innerHTML !== rh) rhEl.innerHTML = rh;
       }
@@ -949,19 +919,23 @@ VIEWS.qdraw = VIEWS.draw;
 function currentOf(st) {
   return status.current && status.current.no === st.qno ? status.current : null;
 }
-function qWinners(st) {
-  return status.winners.filter((w) => w.qno === st.qno);
+// 이 추첨 화면에서 뽑힌 사람: 문제 정답자 추첨이면 그 문제 번호, 마지막 추첨이면 문제 번호 없음
+function winnersOf(st) {
+  const qno = st.stage === 'qdraw' ? st.qno : null;
+  return status.winners.filter((w) => (w.qno ?? null) === qno);
 }
-// 추첨 후보: 문제 정답자 추첨이면 그 문제를 맞힌 사람, 아니면 고른 조건의 참여자 (이미 당첨된 사람 제외)
-function drawPool(st) {
+// 후보 조건을 채운 사람 (당첨 여부와 상관없이): 그 문제를 맞힌 사람 / 정답 기준 이상인 사람
+function qualifiers(st) {
   if (st.stage === 'qdraw') {
     const cur = currentOf(st);
-    if (!cur) return [];
-    const won = new Set(status.participants.filter((p) => p.won).map((p) => p.id));
-    return cur.answers.filter((a) => a.choice === cur.answer && !won.has(a.id));
+    return cur ? cur.answers.filter((a) => a.choice === cur.answer) : [];
   }
-  const ps = status.participants.filter((p) => !p.won);
-  return drawPref.mode === 'all' ? ps : ps.filter((p) => p.score >= drawPref.k);
+  return status.participants.filter((p) => p.score >= minScore());
+}
+// 추첨 후보: 조건을 채운 사람 중 아직 당첨되지 않은 사람 (문제별 당첨자도 빠진다)
+function drawPool(st) {
+  const won = new Set(status.participants.filter((p) => p.won).map((p) => p.id));
+  return qualifiers(st).filter((p) => !won.has(p.id));
 }
 
 // 응답한 사람 아이디: 응답 중에는 최근 순, 정답 공개 뒤에는 맞힌 사람(파랑) 먼저
@@ -1068,7 +1042,7 @@ async function startDraw() {
   const st = steps[stepIdx];
   const qd = st.stage === 'qdraw';
   if (!drawPool(st).length) {
-    toast(qd ? '추첨할 정답자가 없어요.' : '추첨 대상이 없어요. 대상 조건을 바꿔 보세요.');
+    toast(qd ? '추첨할 정답자가 없어요.' : '추첨 대상이 없어요. 정답 기준을 낮춰 보세요.');
     return;
   }
   drawing = true;
@@ -1076,7 +1050,7 @@ async function startDraw() {
   try {
     res = await rpc('quiz_admin_draw', qd
       ? { p_pin: pin, p_qno: st.qno }
-      : { p_pin: pin, p_min_score: drawPref.mode === 'all' ? 0 : drawPref.k });
+      : { p_pin: pin, p_min_score: minScore() });
   } catch (e) {
     drawing = false;
     toast(e.message);
@@ -1365,7 +1339,7 @@ function roulette(pool, winner, poolSize) {
 function showWinner(w) {
   const root = stageEl.querySelector('.draw');
   const ov = root.querySelector('[data-overlay]');
-  root.querySelector('[data-win-rank]').textContent = w.qno ? `Q${w.qno} 정답자 추첨 당첨` : `${w.rank}번째 당첨`;
+  root.querySelector('[data-win-rank]').textContent = w.qno ? `Q${w.qno} 정답자 추첨 당첨` : `${finalTitle()} 당첨`;
   const nameEl = root.querySelector('[data-win-name]');
   nameEl.textContent = w.nickname;
   fitName(nameEl, w.nickname, 220, 1700);

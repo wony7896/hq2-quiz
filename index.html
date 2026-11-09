@@ -317,11 +317,13 @@ function iyeyo(s) {
 
 function doneView() {
   const s = me.state;
+  // 만점자 추첨 후보: 만점이고 아직 당첨되지 않은 사람 (문제별 당첨자는 빠진다)
+  const candidate = me.score === s.total && !me.win;
   const msg = s.stage === 'draw'
-    ? '지금 경품 추첨이 진행 중이에요.<br>앞 화면을 봐 주세요!'
+    ? candidate ? '만점이에요! 나도 추첨 후보예요.<br>앞 화면을 봐 주세요!' : '지금 만점자 추첨이 진행 중이에요.<br>앞 화면을 봐 주세요!'
     : s.stage === 'end'
       ? '함께해 주셔서 감사합니다.'
-      : '곧 경품 추첨이 시작돼요.<br>앞 화면을 봐 주세요!';
+      : candidate ? '만점이에요! 곧 만점자 추첨이 시작돼요.<br>앞 화면을 봐 주세요!' : '곧 만점자 추첨이 시작돼요.<br>앞 화면을 봐 주세요!';
   return `
     <div class="card center">
       <h2>퀴즈 끝!</h2>
@@ -332,7 +334,8 @@ function doneView() {
 }
 
 function winLabel(w) {
-  return w.qno ? `Q${w.qno} 정답자 추첨` : `경품 추첨 ${w.rank}번째`;
+  // 마지막 추첨은 보통 만점자 중에서 뽑고, 만점자가 없어 기준을 낮췄으면 '경품 추첨'으로 부른다
+  return w.qno ? `Q${w.qno} 정답자 추첨` : me.score === me.state.total ? '만점자 추첨' : '경품 추첨';
 }
 
 function winView() {
