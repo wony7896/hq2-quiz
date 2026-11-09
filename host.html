@@ -1090,10 +1090,12 @@ async function startDraw() {
   }
   await roulette(res.pool || [], res.winner.nickname, res.pool_size);
   showWinner(res.winner);
-  drawing = false;
-  refresh();
   // 당첨자 휴대폰이 연출이 끝나자마자 당첨 화면으로 바뀌도록 실시간 알림을 보낸다
   setTimeout(() => rpc('quiz_admin_touch', { p_pin: pin }).catch(() => {}), 900);
+  // 새 당첨자를 받아 온 뒤에야 다음 추첨을 받는다 (→를 연달아 눌러 같은 문제에서 한 명 더 뽑히지 않게)
+  await refresh();
+  drawing = false;
+  render();
 }
 
 // 룰렛: 참여자 아이디가 적힌 판이 3.5초 동안 빠르게 돌고, 마지막 3초는 칸을 넘길 때마다 점점 더 느려진다.

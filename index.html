@@ -280,7 +280,7 @@ function questionView() {
       ? `<div class="result bad"><b>응답하지 않았어요</b><span>다음 문제는 꼭 풀어 보세요!</span></div>`
       : right
         ? `<div class="result good"><b>정답이에요!</b><span>지금까지 ${me.score}개 맞혔어요</span></div>`
-        : `<div class="result bad"><b>아쉬워요</b><span>정답은 ${q.answer + 1}번이에요 · 지금까지 ${me.score}개 정답</span></div>`;
+        : `<div class="result bad"><b>아쉬워요</b><span>정답은 ${ox ? h(q.options[q.answer]) + iyeyo(q.options[q.answer]) : `${q.answer + 1}번이에요`} · 지금까지 ${me.score}개 정답</span></div>`;
     if (q.explanation) tail += `<div class="explain">${h(q.explanation)}</div>`;
     tail += s.stage === 'qdraw'
       ? `<p class="muted">${right && !me.win ? '나도 추첨 후보예요! 앞 화면을 봐 주세요' : '정답자 추첨 중이에요. 앞 화면을 봐 주세요'}</p>`
@@ -305,6 +305,14 @@ function questionView() {
       }).join('')}
     </div>
     ${tail}`;
+}
+
+// O/X처럼 번호가 안 보이는 보기는 보기 글자로 정답을 알려 준다: 받침이 있으면 '이에요', 없으면 '예요'
+function iyeyo(s) {
+  const c = String(s).trim().slice(-1);
+  const code = c.charCodeAt(0) - 0xac00;
+  if (code >= 0 && code < 11172) return code % 28 ? '이에요' : '예요';
+  return '013678LMNRlmnr'.includes(c) ? '이에요' : '예요';
 }
 
 function doneView() {
