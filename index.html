@@ -96,7 +96,7 @@
   .win::before { content: ''; position: absolute; inset: -40% -20% auto auto; width: 260px; height: 260px; border-radius: 50%; background: rgba(255, 207, 63, 0.18); }
   .win .rank { display: inline-block; font-size: 13px; font-weight: 800; background: rgba(255, 255, 255, 0.16); border-radius: 999px; padding: 6px 12px; position: relative; }
   .win h2 { color: var(--gold); font-size: 26px; margin: 14px 0 6px; position: relative; }
-  .win .name { font-size: 40px; font-weight: 900; letter-spacing: -0.03em; position: relative; word-break: break-all; }
+  .win .name { font-size: 40px; font-weight: 900; letter-spacing: -0.03em; line-height: 1.2; position: relative; word-break: keep-all; overflow-wrap: anywhere; }
   .win p { color: rgba(255, 255, 255, 0.85); margin-top: 12px; position: relative; }
 
   footer.me-bar { text-align: center; font-size: 13px; color: var(--muted); padding: 0 16px calc(18px + env(safe-area-inset-bottom)); }
@@ -236,8 +236,8 @@ function joinView() {
     </div>
     <form class="card" id="joinForm" novalidate>
       <label class="lbl" for="nick">참여 아이디</label>
-      <input class="field big" id="nick" maxlength="12" autocomplete="nickname" enterkeyhint="go" placeholder="예: 홍길동" required>
-      <p class="hint">추첨 화면에 이 아이디가 크게 표시돼요.<br>다른 사람과 겹치지 않게 입력해 주세요. (최대 12자)</p>
+      <input class="field big" id="nick" maxlength="13" autocomplete="nickname" enterkeyhint="go" placeholder="예)김원 BX팀" required>
+      <p class="hint">추첨 화면에 이 아이디가 크게 표시돼요.<br>다른 사람과 겹치지 않게 입력해 주세요. (최대 13자)</p>
       <p class="err" id="joinErr"></p>
       <button class="btn block" type="submit">참여하기</button>
     </form>

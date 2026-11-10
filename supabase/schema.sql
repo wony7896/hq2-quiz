@@ -34,7 +34,7 @@ create table public.quiz_questions (
 create table public.quiz_participants (
   id uuid primary key default gen_random_uuid(),
   token uuid not null unique default gen_random_uuid(),
-  nickname text not null check (char_length(nickname) between 1 and 12),
+  nickname text not null check (char_length(nickname) between 1 and 13),
   is_demo boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -131,7 +131,7 @@ declare
   v_nick text := btrim(regexp_replace(coalesce(p_nickname, ''), '\s+', ' ', 'g'));
   v_row public.quiz_participants;
 begin
-  if char_length(v_nick) < 1 or char_length(v_nick) > 12 then
+  if char_length(v_nick) < 1 or char_length(v_nick) > 13 then
     raise exception 'invalid_nickname';
   end if;
   if (select count(*) from public.quiz_participants) >= 1000 then

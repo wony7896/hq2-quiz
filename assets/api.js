@@ -5,7 +5,7 @@ export const SUPABASE_KEY = 'sb_publishable_8aPQtzeRptdI8wflI4Pfxg_X4pVlfX0';
 const ERRORS = {
   invalid_pin: '관리자 PIN이 맞지 않아요.',
   nickname_taken: '이미 사용 중인 아이디예요. 다른 아이디를 입력해 주세요.',
-  invalid_nickname: '아이디는 1~12자로 입력해 주세요.',
+  invalid_nickname: '아이디는 1~13자로 입력해 주세요.',
   full: '참여 인원이 가득 찼어요.',
   closed: '이 문제는 응답이 마감됐어요.',
   not_joined: '참여 정보가 없어요. 다시 참여해 주세요.',

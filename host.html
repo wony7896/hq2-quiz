@@ -153,19 +153,39 @@
   .key-hint kbd { font: inherit; font-weight: 800; color: var(--ink-2); background: #fff; border: 2px solid var(--line); border-radius: 10px; padding: 2px 12px; margin-right: 8px; }
 
   /* ── 결과 ── */
-  .result { padding: 80px 110px 70px; }
-  .result-grid { display: grid; grid-template-columns: 520px 1fr; gap: 40px; margin-top: 48px; flex: 1; min-height: 0; }
-  .tiles { display: grid; grid-template-rows: repeat(3, 1fr); gap: 24px; }
-  .tile { background: #fff; border-radius: 32px; padding: 30px 40px; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: center; }
-  .tile span { font-size: 30px; font-weight: 700; color: var(--ink-2); }
-  .tile b { font-size: 96px; font-weight: 900; color: var(--ink); letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .tile b small { font-size: 40px; font-weight: 700; margin-left: 6px; color: var(--ink-2); }
-  .tile.accent { background: var(--b-blue); }
-  .tile.accent span, .tile.accent b, .tile.accent b small { color: #fff; }
-  .chart-card { background: #fff; border-radius: 32px; padding: 36px 44px 28px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 0; }
-  .chart-card h3 { margin: 0 0 8px; font-size: 32px; font-weight: 800; color: var(--ink); }
-  .chart-card svg { flex: 1; width: 100%; min-height: 0; }
-  .perfect { display: flex; align-items: center; gap: 28px; margin-top: 32px; min-height: 64px; }
+  .result { padding: 72px 110px 56px; }
+  /* 하루 입장 70명 기준: 그래프를 화면 너비 가득 쓰고, 숫자 요약은 제목 줄에 둔다 */
+  .result-head { display: flex; align-items: center; justify-content: space-between; gap: 40px; }
+  .kpis { display: flex; gap: 16px; }
+  .kpi { display: flex; align-items: baseline; gap: 14px; background: #fff; border-radius: 999px; padding: 16px 34px; box-shadow: var(--shadow); }
+  .kpi span { font-size: 26px; font-weight: 700; color: var(--ink-2); }
+  .kpi b { font-size: 52px; font-weight: 900; color: var(--ink); letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .kpi b small { font-size: 28px; font-weight: 700; margin-left: 4px; color: var(--ink-2); }
+  .kpi.accent { background: var(--b-blue); }
+  .kpi.accent span, .kpi.accent b, .kpi.accent b small { color: #fff; }
+  .chart-card { flex: 1; min-height: 0; margin-top: 36px; background: #fff; border-radius: 32px; padding: 32px 44px 24px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+  .chart-card h3 { margin: 0; font-size: 30px; font-weight: 800; color: var(--ink); }
+  /* 정답 개수별 인원: 막대 대신 이름을 아래에서부터 쌓는다 */
+  .stack-chart { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 8px; }
+  .stack-cols, .stack-x { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); column-gap: 8px; }
+  .stack-cols { flex: 1; min-height: 0; overflow: hidden; border-bottom: 3px solid #e3e9f5; }
+  .stack-col { display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; }
+  .stack-col > b { text-align: center; font-size: 30px; font-weight: 800; color: var(--ink); line-height: 1; margin-bottom: 10px; font-variant-numeric: tabular-nums; }
+  .stack-col > b small { font-size: 20px; font-weight: 700; margin-left: 2px; color: var(--ink-2); }
+  .stack { display: flex; flex-wrap: wrap-reverse; gap: var(--g); }
+  .stack > span {
+    flex: 0 0 calc((100% - (var(--k) - 1) * var(--g)) / var(--k)); height: var(--rh); line-height: var(--rh);
+    font-size: var(--fs); font-weight: 700; color: #fff; background: var(--b-blue); border-radius: 6px;
+    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px;
+    animation: stack-in 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) both; animation-delay: var(--d);
+  }
+  .stack-col.top .stack > span { background: var(--gold); color: #0b1f5b; }
+  .stack > span.more { background: #d7e2fb; color: var(--ink); }
+  .stack-x { margin-top: 12px; }
+  .stack-x span { text-align: center; font-size: 24px; font-weight: 700; color: #44516f; }
+  .stack-x span:last-child { color: var(--ink); font-weight: 800; }
+  @keyframes stack-in { from { opacity: 0; transform: translateY(-40px); } }
+  .perfect { display: flex; align-items: center; gap: 28px; margin-top: 28px; min-height: 64px; }
   .perfect > span { flex: none; font-size: 30px; font-weight: 800; color: var(--b-blue); }
   .perfect .chips { max-height: 56px; overflow: hidden; }
 
@@ -722,37 +742,38 @@ const VIEWS = {
   result: {
     html: () => `
       <section class="slide result">
-        <h2 class="title">퀴즈 결과</h2>
-        <div class="result-grid">
-          <div class="tiles">
-            <div class="tile"><span>참여자</span><b data-people>0</b></div>
-            <div class="tile"><span>평균 정답</span><b data-avg>0</b></div>
-            <div class="tile accent"><span>만점자</span><b data-perfect>0</b></div>
+        <div class="result-head">
+          <h2 class="title">퀴즈 결과</h2>
+          <div class="kpis">
+            <div class="kpi"><span>참여자</span><b data-people>0</b></div>
+            <div class="kpi"><span>평균 정답</span><b data-avg>0</b></div>
+            <div class="kpi accent"><span>만점자</span><b data-perfect>0</b></div>
           </div>
-          <div class="chart-card"><h3>정답 개수별 인원</h3><svg data-chart viewBox="0 0 1080 560" role="img" aria-label="정답 개수별 인원 막대그래프"></svg></div>
         </div>
+        <div class="chart-card"><h3>정답 개수별 인원</h3><div class="stack-chart" data-chart role="img" aria-label="정답 개수별 인원 그래프"></div></div>
         <div class="perfect"><span>만점자</span><div class="chips" data-perfect-list></div></div>
       </section>`,
     update() {
       const root = stageEl.querySelector('.result');
       const ps = status.participants;
       const n = total();
-      const dist = Array.from({ length: n + 1 }, () => 0);
-      ps.forEach((p) => { dist[Math.min(p.score, n)]++; });
       const perfect = ps.filter((p) => p.score === n);
       const avg = ps.length ? ps.reduce((a, p) => a + p.score, 0) / ps.length : 0;
       root.querySelector('[data-people]').innerHTML = `${ps.length}<small>명</small>`;
       root.querySelector('[data-avg]').innerHTML = `${avg.toFixed(1)}<small>개</small>`;
       root.querySelector('[data-perfect]').innerHTML = `${perfect.length}<small>명</small>`;
-      root.querySelector('[data-perfect-list]').innerHTML = perfect.length
-        ? perfect.slice(0, 24).map((p) => `<span class="chip">${h(p.nickname)}</span>`).join('') + (perfect.length > 24 ? `<span class="chip more">외 ${perfect.length - 24}명</span>` : '')
-        : '<span class="chip more">아쉽게도 만점자가 없어요</span>';
-      const sig = dist.join(',');
-      const svg = root.querySelector('[data-chart]');
-      if (svg.dataset.sig !== sig) {
-        svg.dataset.sig = sig;
-        svg.innerHTML = barChart(dist);
+      // 한 줄에 다 안 들어가면 뒤쪽 아이디는 '외 N명'으로 묶는다
+      const listEl = root.querySelector('[data-perfect-list]');
+      const psig = perfect.map((p) => p.id).join();
+      if (listEl.dataset.sig !== psig) {
+        listEl.dataset.sig = psig;
+        if (perfect.length) {
+          const shown = perfect.slice(0, 40);
+          listEl.innerHTML = shown.map((p) => `<span class="chip">${h(p.nickname)}</span>`).join('') + '<span class="chip more" hidden></span>';
+          fitChips(listEl, perfect.length - shown.length);
+        } else listEl.innerHTML = '<span class="chip more">아쉽게도 만점자가 없어요</span>';
       }
+      renderStacks(root.querySelector('[data-chart]'), ps, n);
     },
   },
 
@@ -979,32 +1000,85 @@ function fitChips(el, rest) {
   }
 }
 
-function barChart(dist) {
-  const W = 1080, H = 560, L = 64, R = 16, T = 40, B = 64;
-  const max = Math.max(1, ...dist);
-  const niceMax = max <= 5 ? max : Math.ceil(max / 5) * 5;
-  const n = dist.length;
-  const slot = (W - L - R) / n;
-  const bw = Math.min(64, slot * 0.62);
-  const y = (v) => T + (H - T - B) * (1 - v / niceMax);
-  const ticks = [0, 0.5, 1].map((f) => Math.round(niceMax * f));
-  let out = '';
-  [...new Set(ticks)].forEach((t) => {
-    out += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="#e3e9f5" stroke-width="2"/>`;
-    out += `<text x="${L - 14}" y="${y(t) + 9}" text-anchor="end" font-size="24" font-weight="600" fill="#7b88a6">${t}</text>`;
-  });
-  dist.forEach((v, i) => {
-    const cx = L + slot * i + slot / 2;
-    const top = y(v);
-    const hgt = H - B - top;
-    if (v > 0) {
-      const r = Math.min(4, hgt);
-      out += `<path d="M${cx - bw / 2},${H - B} V${top + r} Q${cx - bw / 2},${top} ${cx - bw / 2 + r},${top} H${cx + bw / 2 - r} Q${cx + bw / 2},${top} ${cx + bw / 2},${top + r} V${H - B} Z" fill="${i === n - 1 ? '#0b1f5b' : '#1d57e6'}"><title>${i}개 정답: ${v}명</title></path>`;
-      out += `<text x="${cx}" y="${top - 12}" text-anchor="middle" font-size="28" font-weight="800" fill="#0e1a3a">${v}</text>`;
-    }
-    out += `<text x="${cx}" y="${H - B + 42}" text-anchor="middle" font-size="24" font-weight="700" fill="#44516f">${i}개</text>`;
-  });
-  return out;
+// 그래프에 쌓을 이름: 팀명은 뺀다 ("김원 BX팀", "BX팀/김원", "김원(BX팀)", "AT/DT서비스팀 김원" → "김원")
+// '팀'으로 끝나는 말을 빼고, 남은 것 중 한글 2~4자(이름)를 먼저 고른다.
+function shortName(nick) {
+  const raw = String(nick ?? '').replace(/[(（[][^)）\]]*[)）\]]/g, ' ');
+  const parts = raw.split(/[\s,/_·|()（）[\]]+/).filter(Boolean);
+  const rest = parts.filter((w) => !w.endsWith('팀'));
+  // 띄우지 않고 붙여 쓴 "김원BX팀"은 앞쪽 한글만 쓴다
+  const glued = parts.map((w) => w.match(/^([가-힣]{2,4})[^가-힣]/)).find(Boolean);
+  return rest.find((w) => /^[가-힣]{2,4}$/.test(w)) || rest[0] || glued?.[1] || parts[0] || String(nick ?? '');
+}
+
+let measureCtx = null;
+function textWidth(s, px) {
+  measureCtx ??= document.createElement('canvas').getContext('2d');
+  measureCtx.font = `700 ${px}px ${CANVAS_FONT}`;
+  return measureCtx.measureText(s).width;
+}
+
+// 정답 개수별 인원: 정답 개수마다 이름을 아래에서부터 쌓는다.
+// 이름 칸 높이와 한 줄에 놓는 이름 수는 모든 칸에 똑같이 써서, 쌓인 높이가 곧 인원이 되게 한다.
+function renderStacks(el, ps, n) {
+  const groups = Array.from({ length: n + 1 }, () => []);
+  ps.forEach((p) => groups[Math.max(0, Math.min(p.score, n))].push({ id: p.id, name: shortName(p.nickname), full: p.nickname }));
+  groups.forEach((g) => g.sort((a, b) => a.name.localeCompare(b.name, 'ko') || String(a.id).localeCompare(String(b.id))));
+  const sig = groups.map((g) => g.map((p) => `${p.id}:${p.full}`).join()).join('|');
+  if (el.dataset.sig === sig) return;
+  el.dataset.sig = sig;
+
+  const cols = n + 1;
+  const COL_GAP = 8;
+  el.style.setProperty('--cols', cols);
+  el.innerHTML = `<div class="stack-cols"></div><div class="stack-x">${groups.map((_, i) => `<span>${i}개</span>`).join('')}</div>`;
+  const area = el.firstElementChild;
+  const colW = (area.clientWidth - COL_GAP * (cols - 1)) / cols;
+  const availH = area.clientHeight - 44; // 위쪽 인원 숫자 자리
+  const max = Math.max(1, ...groups.map((g) => g.length));
+  // 글자 크기 1px일 때 이름 폭. 대부분(90%)의 이름에 맞춰 크기를 정하고, 그보다 긴 이름만 그 칸에서 글자를 줄인다.
+  const all = groups.flat();
+  all.forEach((p) => { p.w = textWidth(p.name, 1); });
+  const widths = all.map((p) => p.w).sort((a, b) => a - b);
+  const p90 = widths.length ? widths[Math.floor((widths.length - 1) * 0.9)] : 0;
+  const unit = Math.min(textWidth('가나다라', 1), Math.max(textWidth('가나다', 1), p90));
+  const fit = (k) => {
+    const gap = 3;
+    const rows = Math.ceil(max / k);
+    const rh = Math.min(44, (availH - gap * (rows - 1)) / rows);
+    const cellW = (colW - gap * (k - 1)) / k;
+    return { k, gap, rh, fs: Math.min(24, rh * 0.6, (cellW - 6) / unit) };
+  };
+  let best = fit(1);
+  for (let k = 2; k <= 6; k++) { const f = fit(k); if (f.fs > best.fs) best = f; }
+  // 하루 70명이면 한 칸에 모두 몰려도 11px 이상으로 다 들어간다.
+  // 그보다 훨씬 많아 글자가 너무 작아질 때만 11px로 쌓고, 넘치는 사람은 맨 위 '+N'으로 묶는다
+  let cap = Infinity;
+  if (best.fs < 11) {
+    const gap = 2, rh = 18;
+    let k = 1;
+    while (k < 6 && (colW - gap * k) / (k + 1) - 6 >= 11 * unit) k++;
+    best = { k, gap, rh, fs: 11 };
+    cap = Math.max(1, Math.floor((availH + gap) / (rh + gap))) * k;
+  }
+  const { k, gap, rh } = best;
+  const fs = Math.floor(best.fs);
+  const room = (colW - gap * (k - 1)) / k - 6; // 이름 한 칸의 글자 폭
+  const own = (p) => (p.w * fs > room ? `;font-size:${Math.max(9, Math.floor(room / p.w))}px` : '');
+  el.style.setProperty('--k', k);
+  el.style.setProperty('--g', `${gap}px`);
+  el.style.setProperty('--rh', `${Math.floor(rh)}px`);
+  el.style.setProperty('--fs', `${fs}px`);
+  // 아래 줄부터 차례로 쌓이는 연출 (전체 1.6초 안팎)
+  const rowsMax = Math.max(1, Math.ceil(Math.min(max, cap) / k));
+  const delay = (j, i) => `${((Math.floor(j / k) / rowsMax) * 1.2 + i * 0.04).toFixed(2)}s`;
+  area.innerHTML = groups.map((g, i) => {
+    const list = g.length > cap ? g.slice(0, cap - 1) : g;
+    const more = g.length - list.length;
+    const items = list.map((p, j) => `<span title="${h(p.full)}" style="--d:${delay(j, i)}${own(p)}">${h(p.name)}</span>`).join('')
+      + (more ? `<span class="more" style="--d:${delay(list.length, i)}">+${more}</span>` : '');
+    return `<div class="stack-col${i === n ? ' top' : ''}">${g.length ? `<b>${g.length}<small>명</small></b>` : ''}<div class="stack">${items}</div></div>`;
+  }).join('');
 }
 
 // ───────── 추첨 연출 ─────────
