@@ -417,10 +417,22 @@ let drawing = false;
 let overlayOpen = false;
 let voterSeen = new Set();
 let arenaSig = '';
-// 마지막 추첨의 정답 기준: 처음에는 만점(문제 수). 만점자가 없으면 진행자가 − 로 낮출 수 있다
+// 마지막 추첨의 정답 기준 (정답 N개 이상)은 서버가 정한다: 문제별 추첨 당첨자를 뺀 사람 중 가장 높은 정답 수.
+// 만점자가 있으면 만점자 추첨, 없으면 그다음으로 가장 많이 맞힌 사람들 중에서 뽑는다.
+// 진행자는 오른쪽 위 −/+ 로 바꿀 수 있다. 서버에 기준이 없으면(DB 변경 전) 이 화면에서 같은 방식으로 계산한다.
 let finalMin = null;
-const minScore = () => Math.max(1, Math.min(total() || 1, finalMin ?? total()));
-const finalTitle = () => (minScore() === total() ? '만점자 추첨' : `정답 ${minScore()}개 이상 추첨`);
+let minBusy = false;
+function autoMin() {
+  if (!status) return total();
+  const qwon = new Set(status.winners.filter((w) => w.qno != null).map((w) => w.nickname));
+  const left = status.participants.filter((p) => !qwon.has(p.nickname));
+  return left.length ? Math.max(...left.map((p) => p.score)) : total();
+}
+const minScore = () => Math.max(1, Math.min(total() || 1, status?.state.draw_min ?? finalMin ?? autoMin()));
+const topScore = () => (status?.participants.length ? Math.max(...status.participants.map((p) => p.score)) : 0);
+// 만점 기준이면 '만점자', 참여자 중 최고 정답 수와 같으면 '최다 정답자', 그보다 낮추면 '정답 N개 이상'
+const finalWho = () => (minScore() >= total() ? '만점자' : minScore() === topScore() ? '최다 정답자' : '대상자');
+const finalTitle = () => (finalWho() === '대상자' ? `정답 ${minScore()}개 이상 추첨` : `${finalWho()} 추첨`);
 
 // ───────── 공통 ─────────
 function fit() {
@@ -482,7 +494,8 @@ function stepName(st) {
   if (!st) return '-';
   if (st.stage === 'qdraw') return `Q${st.qno} 정답자 추첨`;
   if (st.stage === 'qna') return `조합원 질문 ${st.qno}`;
-  return { cover: '표지 · QR', result: '퀴즈 결과', draw: '만점자 추첨', end: '마무리' }[st.stage]
+  if (st.stage === 'draw') return status ? finalTitle() : '마지막 추첨';
+  return { cover: '표지 · QR', result: '퀴즈 결과', end: '마무리' }[st.stage]
     || `Q${st.qno} ${st.revealed ? '정답 공개' : '응답 받는 중'}`;
 }
 
@@ -540,6 +553,8 @@ async function refresh() {
   try {
     const s = await rpc('quiz_admin_status', { p_pin: pin });
     setConn(true);
+    // −/+ 로 바꾼 기준을 저장하는 중이면 바꾼 값을 그대로 둔다 (잠깐 이전 값으로 돌아가 보이지 않게)
+    if (minBusy && status) s.state.draw_min = status.state.draw_min;
     if (s.state.total !== questions.length) await loadQuestions();
     if (s.qna.length !== qnaCount) {
       qnaCount = s.qna.length;
@@ -751,26 +766,31 @@ const VIEWS = {
           </div>
         </div>
         <div class="chart-card"><h3>정답 개수별 인원</h3><div class="stack-chart" data-chart role="img" aria-label="정답 개수별 인원 그래프"></div></div>
-        <div class="perfect"><span>만점자</span><div class="chips" data-perfect-list></div></div>
+        <div class="perfect"><span data-perfect-label>만점자</span><div class="chips" data-perfect-list></div></div>
       </section>`,
     update() {
       const root = stageEl.querySelector('.result');
       const ps = status.participants;
       const n = total();
       const perfect = ps.filter((p) => p.score === n);
+      // 만점자가 없으면 가장 많이 맞힌 사람들을 대신 보여 준다 (다음 화면이 최다 정답자 추첨)
+      const top = topScore();
+      const best = perfect.length || !top ? perfect : ps.filter((p) => p.score === top);
       const avg = ps.length ? ps.reduce((a, p) => a + p.score, 0) / ps.length : 0;
       root.querySelector('[data-people]').innerHTML = `${ps.length}<small>명</small>`;
       root.querySelector('[data-avg]').innerHTML = `${avg.toFixed(1)}<small>개</small>`;
       root.querySelector('[data-perfect]').innerHTML = `${perfect.length}<small>명</small>`;
       // 한 줄에 다 안 들어가면 뒤쪽 아이디는 '외 N명'으로 묶는다
+      root.querySelector('[data-perfect-label]').textContent = perfect.length || !top ? '만점자' : `최다 정답 ${top}개`;
       const listEl = root.querySelector('[data-perfect-list]');
-      const psig = perfect.map((p) => p.id).join();
+      // 결과 화면에는 팀명을 뺀 이름만 쓴다
+      const psig = best.map((p) => `${p.id}:${p.nickname}`).join();
       if (listEl.dataset.sig !== psig) {
         listEl.dataset.sig = psig;
-        if (perfect.length) {
-          const shown = perfect.slice(0, 40);
-          listEl.innerHTML = shown.map((p) => `<span class="chip">${h(p.nickname)}</span>`).join('') + '<span class="chip more" hidden></span>';
-          fitChips(listEl, perfect.length - shown.length);
+        if (best.length) {
+          const shown = best.slice(0, 40);
+          listEl.innerHTML = shown.map((p) => `<span class="chip" title="${h(p.nickname)}">${h(shortName(p.nickname))}</span>`).join('') + '<span class="chip more" hidden></span>';
+          fitChips(listEl, best.length - shown.length);
         } else listEl.innerHTML = '<span class="chip more">아쉽게도 만점자가 없어요</span>';
       }
       renderStacks(root.querySelector('[data-chart]'), ps, n);
@@ -838,12 +858,21 @@ const VIEWS = {
         if (!confirm(`'${w.nickname}' 당첨을 취소할까요?\n취소하면 다시 추첨할 수 있어요.`)) return;
         removeWinner(w.id);
       });
-      // 마지막 추첨: 만점자가 없거나 모두 당첨됐으면 정답 기준을 낮출 수 있다
-      root.querySelectorAll('[data-k]').forEach((el) => el.addEventListener('click', (e) => {
+      // 마지막 추첨: 대상자가 모두 당첨됐거나 더 넓혀 뽑고 싶으면 정답 기준을 바꿀 수 있다.
+      // 바꾼 기준은 서버에 저장해 휴대폰의 '추첨 후보' 안내도 같이 바뀐다
+      root.querySelectorAll('[data-k]').forEach((el) => el.addEventListener('click', async (e) => {
         e.currentTarget.blur();
-        if (drawing || overlayOpen) return;
-        finalMin = Math.max(1, Math.min(total(), minScore() + Number(el.dataset.k)));
+        if (drawing || overlayOpen || minBusy) return;
+        const k = Math.max(1, Math.min(total(), minScore() + Number(el.dataset.k)));
+        if (status.state.draw_min == null) { finalMin = k; render(); return; }
+        minBusy = true;
+        status.state.draw_min = k;
         render();
+        try {
+          await rpc('quiz_admin_set_draw_min', { p_pin: pin, p_min: k });
+        } catch (err) { toast(err.message); }
+        minBusy = false;
+        refresh();
       }));
     },
     update(st) {
@@ -867,7 +896,7 @@ const VIEWS = {
       if (overlayOpen) return;
       // 추첨 상자: 대기 / 이번 추첨 당첨자 / 후보 없음
       const mine = winnersOf(st);
-      const who = qd ? '정답자' : minScore() === total() ? '만점자' : '대상자';
+      const who = qd ? '정답자' : finalWho();
       const after = !qd ? '마무리' : st.qno < total() ? '다음 문제' : '퀴즈 결과';
       let name = 'READY';
       let hint = `<kbd>Space</kbd> 또는 <kbd>→</kbd> 를 누르면 ${who} 중 한 명을 추첨합니다`;
@@ -1000,15 +1029,36 @@ function fitChips(el, rest) {
   }
 }
 
-// 그래프에 쌓을 이름: 팀명은 뺀다 ("김원 BX팀", "BX팀/김원", "김원(BX팀)", "AT/DT서비스팀 김원" → "김원")
-// '팀'으로 끝나는 말을 빼고, 남은 것 중 한글 2~4자(이름)를 먼저 고른다.
+// 결과 화면에 쓸 이름: 팀명은 뺀다 ("김원 BX팀", "BX팀/김원", "김원(BX팀)", "AT/DT서비스팀 김원",
+// "김원BX팀", "김원리테일팀", "김원수도권NW지원팀" → "김원")
+// '팀'으로 끝나는 말과 팀 이름으로 보이는 말을 빼고, 남은 것 중 한글 2~4자(이름)를 먼저 고른다.
+// 팀 이름 첫머리: 이름 뒤에 띄우지 않고 팀명을 붙여 쓰면 이 말이 시작하는 곳에서 이름을 자른다
+const TEAM_HEADS = [
+  '수도권', '리테일', '리텐션', '브랜드', '브컴', '전략', '영업', '영기', '기획', '마케팅', '구매', '지원', '수북',
+  '경영', '재무', '회계', '인사', '총무', '노무', '노사', '홍보', '법무', '감사', '정책', '대외', '품질', '안전',
+  '고객', '서비스', '상품', '사업', '개발', '기술', '운영', '플랫폼', '미디어', '콘텐츠', '채널', '세일즈', '디지털',
+  '데이터', '보안', '네트워크', '인프라', '솔루션', '커머스', '커뮤니케이션', '엔터프라이즈', '본사', '본부',
+  '부산', '대구', '광주', '대전', '강원', '충청', '호남', '영남', '서부', '동부', '남부', '북부', '중부',
+];
+const isTeamWord = (w) => w.endsWith('팀') || TEAM_HEADS.includes(w);
+function nameOfGlued(w) {
+  const han = (w.match(/^[가-힣]+/) || [''])[0];
+  if (han.length < 2) return null;
+  // "김원BX팀": 한글 뒤에 영문이 붙으면 앞쪽 한글이 이름
+  if (han.length <= 4 && (han.length < w.length || !w.endsWith('팀'))) return han;
+  // "이상식리테일팀", "이완석수도권NW지원팀": 팀 이름이 시작하는 곳에서 자르고, 못 찾으면 세 글자
+  for (const i of [3, 2, 4]) if (han.length > i && TEAM_HEADS.some((t) => han.startsWith(t, i))) return han.slice(0, i);
+  return han.length > 4 ? han.slice(0, 3) : null;
+}
 function shortName(nick) {
-  const raw = String(nick ?? '').replace(/[(（[][^)）\]]*[)）\]]/g, ' ');
-  const parts = raw.split(/[\s,/_·|()（）[\]]+/).filter(Boolean);
-  const rest = parts.filter((w) => !w.endsWith('팀'));
-  // 띄우지 않고 붙여 쓴 "김원BX팀"은 앞쪽 한글만 쓴다
-  const glued = parts.map((w) => w.match(/^([가-힣]{2,4})[^가-힣]/)).find(Boolean);
-  return rest.find((w) => /^[가-힣]{2,4}$/.test(w)) || rest[0] || glued?.[1] || parts[0] || String(nick ?? '');
+  const full = String(nick ?? '').trim();
+  const raw = full.replace(/[(（[][^)）\]]*[)）\]]/g, ' ');
+  const parts = raw.split(/[\s,/_·|()（）[\].\-]+/).filter(Boolean);
+  const rest = parts.filter((w) => !isTeamWord(w));
+  const named = rest.find((w) => /^[가-힣]{2,4}$/.test(w));
+  if (named) return named;
+  const glued = parts.map(nameOfGlued).find(Boolean);
+  return glued || rest[0] || parts[0] || full;
 }
 
 let measureCtx = null;
